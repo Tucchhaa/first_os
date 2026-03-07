@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        {
+            "name": "OPIRV2",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "PLATFORM_OPIRV2"
+            ],
+            "compilerPath": "/opt/homebrew/bin/riscv64-unknown-elf-gcc"
+        },
+        {
+            "name": "QEMU",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "PLATFORM_QEMU"
+            ],
+            "compilerPath": "/opt/homebrew/bin/riscv64-unknown-elf-gcc"
+        }
+    ],
+    "version": 4
+}
