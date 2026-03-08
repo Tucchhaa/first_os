@@ -36,6 +36,10 @@ struct sbiret sbi_ecall_default(int ext, int fid) {
     return sbi_ecall(ext, fid, 0, 0, 0, 0, 0, 0);
 }
 
+// if sbiret.value == 0, then ext is not supported
+struct sbiret sbi_probe_extension(int ext) {
+    return sbi_ecall(0x10, 3, ext, 0, 0, 0, 0, 0);
+}
 
 struct sbiret sbi_get_spec_version(void) {
     return sbi_ecall_default(0x10, 0x0);
