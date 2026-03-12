@@ -1,3 +1,4 @@
+from glob import glob
 import os
 import subprocess
 import sys
@@ -13,90 +14,143 @@ BUILD_DIR = "./build"
 OBJ_DIR = os.path.join(BUILD_DIR, "obj")
 PLATFORM_DIR = "./platform"
 
+def main():
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--platform", choices=get_platforms(), required=True)
+    args = arg_parser.parse_args()
+
+    # Remove old build files
+    execute(["rm", "-rf", OBJ_DIR])
+
+    os.makedirs(BUILD_DIR, exist_ok=True)
+    os.makedirs(OBJ_DIR, exist_ok=True)
+
+    for pattern in ["*.elf", "*.bin", "*.fit"]:
+        for f in glob(os.path.join(BUILD_DIR, pattern)):
+            os.remove(f)
+
+    # Build
+    bootloader = BootLoader(args.platform)
+    bootloader.build()
+    bootloader.create_fit_image()
+
+    kernel = Kernel(args.platform)
+    kernel.build()
+
+    print("\n\nDone!")
+
+
 def get_platforms():
     platforms = []
+
     for entry in os.listdir(PLATFORM_DIR):
         path = os.path.join(PLATFORM_DIR, entry)
+
         if os.path.isdir(path):
             platforms.append(entry)
+
     return platforms
 
-def execute(stage_name, cmd, cleanup=False):
-    print(' '.join(cmd))
+def execute(cmd, cleanup=False):
     result = subprocess.run(cmd)
 
-    if result.returncode != 0:
-        print(f"Error during {stage_name.lower()}")
-
-        if cleanup:
-            cleanup()
-
-        sys.exit(1)
-    
     if cleanup:
         cleanup()
 
-# Parse command-line arguments
-arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument("--platform", choices=get_platforms(), required=True)
-args = arg_parser.parse_args()
+    if result.returncode != 0:
+        print(f"Error during: {' '.join(cmd)}")
+        sys.exit(1)
 
-platform_dir = os.path.join(PLATFORM_DIR, args.platform)
+class Project:
+    def __init__(self, platform):
+        self.name = None
+        self.platform = platform
+        self.platform_dir = os.path.join(PLATFORM_DIR, self.platform)
+        self.linker_script = None
+        self.source_files = []
+    
+    def build(self):
+        print(f"\n\n[Building {self.name}]")
 
-# Create build directory if it doesn't exist
-os.makedirs(BUILD_DIR, exist_ok=True)
-os.makedirs(OBJ_DIR, exist_ok=True)
+        # Compilation
+        print("=> Compilation")
 
-# Clean up old files
-for root, dirs, files in os.walk(OBJ_DIR):
-    for file in files:
-        os.remove(os.path.join(root, file))
+        obj_files = []
 
-os.remove(os.path.join(BUILD_DIR, "kernel.elf")) if os.path.exists(os.path.join(BUILD_DIR, "kernel.elf")) else None
-os.remove(os.path.join(BUILD_DIR, "kernel.bin")) if os.path.exists(os.path.join(BUILD_DIR, "kernel.bin")) else None
-os.remove(os.path.join(BUILD_DIR, "kernel.fit")) if os.path.exists(os.path.join(BUILD_DIR, "kernel.fit")) else None
+        for c_file in self.source_files:
+            out_file = os.path.relpath(c_file, SRC_DIR).replace(".c", ".o").replace(".S", ".o")
+            out_path = os.path.join(OBJ_DIR, out_file)
 
-# Find source files
-c_files = [
-    os.path.join(root, file)
-    for root, _, files in os.walk(SRC_DIR)
-    for file in files
-    if file.endswith(".c") or file.endswith(".S")
-]
+            print(f"Compiling: {c_file} -> {out_path}")
 
-if not c_files:
-    print("No source files found!")
-    sys.exit(1)
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            obj_files.append(out_path)
 
-# Compile each file
-obj_files = []
+            cmd = [COMPILER] + ["-c", "-mcmodel=medany", f"-DPLATFORM_{self.platform.upper()}"] + [c_file, "-o", out_path]
+            
+            execute(cmd)
 
-for c_file in c_files:
-    src_path = c_file
-    out_path = os.path.join(OBJ_DIR, os.path.relpath(c_file, SRC_DIR).replace(".c", ".o").replace(".S", ".o"))
+        # Linking
+        print("=> Linking")
 
-    cmd = [COMPILER] + ["-c", "-mcmodel=medany", f"-DPLATFORM_{args.platform.upper()}"] + [src_path, "-o", out_path]
-    execute(f"Compiling: {c_file} -> {out_path}", cmd)
+        linker_path = os.path.join(self.platform_dir, self.linker_script)
+        elf_path = os.path.join(BUILD_DIR, f"{self.name}.elf")
+        cmd = [LINKER] + ["-T", linker_path] + ["-o", elf_path] + obj_files 
 
-    obj_files.append(out_path)
+        execute(cmd)
 
-# Link object files
-linker_script = os.path.join(platform_dir, "linker.ld")
+        # Create binary
+        print("=> Creating binary")
 
-cmd = [LINKER] + ["-T", linker_script] + ["-o", os.path.join(BUILD_DIR, "kernel.elf")] + obj_files 
-execute("Linking", cmd)
+        bin_path = os.path.join(BUILD_DIR, f"{self.name}.bin")
+        cmd = [OBJ_COPY, "-O", "binary", elf_path, bin_path]
 
-# Create binary
-cmd = [OBJ_COPY, "-O", "binary", os.path.join(BUILD_DIR, "kernel.elf"), os.path.join(BUILD_DIR, "kernel.bin")]
-execute("Creating binary", cmd)
+        execute(cmd)
 
-# Create FIT image
-its_path = os.path.join(platform_dir, "kernel.its")
+class BootLoader(Project):
+    def __init__(self, platform):
+        super().__init__(platform)
+        self.name = "bootloader"
+        self.linker_script = "linker_bootloader.ld"
+        self.source_files = [
+            "src/bootloader/entry.S",
+            "src/bootloader/bootloader.c",
+            "src/uart.c",
+            "src/string.c"
+        ]
 
-if os.path.exists(its_path):
-    os.system(f"cp {os.path.join(BUILD_DIR, 'kernel.bin')} {os.path.join(platform_dir, 'kernel.bin')}")
+    def create_fit_image(self):
+        print("=> Creating FIT image")
+        its_path = os.path.join(self.platform_dir, "bootloader.its")
 
-    cmd = ["mkimage", "-f", os.path.join(platform_dir, "kernel.its"), os.path.join(BUILD_DIR, "kernel.fit")]
-    execute("Creating FIT image", cmd, lambda: os.remove(os.path.join(platform_dir, "kernel.bin")))
+        if not os.path.exists(its_path):
+            print(f"{its_path} not found, skipping FIT image creation")
+            return
 
-print("Done!")
+        # Copy bin to platform dir for mkimage to find it
+        bin_path = os.path.join(BUILD_DIR, f"{self.name}.bin")
+        bin_copy_path = os.path.join(self.platform_dir, f"{self.name}.bin")
+        
+        os.system(f"cp {bin_path} {bin_copy_path}")
+
+        # Create FIT image
+
+        fit_path = os.path.join(BUILD_DIR, f"{self.name}.fit")
+        cmd = ["mkimage", "-f", its_path, fit_path]
+
+        execute(cmd, cleanup=lambda: os.remove(bin_copy_path))
+
+class Kernel(Project):
+    def __init__(self, platform):
+        super().__init__(platform)
+        self.name = "kernel"
+        self.linker_script = "linker.ld"
+        self.source_files = [
+            "src/kernel/entry.S",
+            "src/kernel/kmain.c",
+            "src/uart.c",
+            "src/sbi.c",
+            "src/string.c"
+        ]
+
+main()

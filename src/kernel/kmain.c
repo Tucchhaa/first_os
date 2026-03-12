@@ -1,8 +1,8 @@
-#include "uart.h"
-#include "sbi.h"
-#include "string.h"
+#include "../uart.h"
+#include "../sbi.h"
+#include "../string.h"
 
-void cli(void) {
+static void cli(void) {
     const int command_max_size = 100;
     char command[command_max_size];
 

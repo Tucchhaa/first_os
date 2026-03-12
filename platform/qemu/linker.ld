@@ -2,12 +2,12 @@ ENTRY(_start)
 
 MEMORY
 {
-  RAM (rwx) : ORIGIN = 0x80200000, LENGTH = 64M
+  RAM (rwx) : ORIGIN = 0x82000000, LENGTH = 64M
 }
 
 SECTIONS
 {
-    . = 0x80200000;
+    . = ORIGIN(RAM);
 
     .text : { 
         *(.text.init)
