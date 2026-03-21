@@ -1,10 +1,15 @@
 #include "../platform.h"
 #include "../uart.h"
 #include "../string.h"
+#include "../fdt.h"
+#include "../utils.h"
+
+uint64_t hartid;
+uintptr_t fdt_addr;
 
 static void receive_kernel_bin(int kernel_size) {
     const uintptr_t KERNEL_ADDR = KERNEL_LOAD_ADDR;
-    int loaded_bytes_count = 0;
+    uint32_t loaded_bytes_count = 0;
 
     while (loaded_bytes_count < kernel_size) {
         uint8_t byte;
@@ -18,35 +23,68 @@ static void receive_kernel_bin(int kernel_size) {
     asm volatile ("fence"   ::: "memory");
     asm volatile ("fence.i" ::: "memory");
 
-    ((void (*)(void))KERNEL_ADDR)();
+    ((void (*)(uint64_t, uintptr_t))KERNEL_ADDR)(hartid, fdt_addr);
 }
 
-void bootloader(void) {
+static void cli(void) {
     const int command_max_size = 100;
     char command[command_max_size];
+
+    uart_puts("cli\n");
 
     while(1) {
         uart_puts("bootloader> ");
         uart_getline(command, command_max_size);
 
         if (streql(command, "help")) {
-            uart_puts("To load kernel run \'load\' command and send kernel.bin over UART\n");
-        } else if (streql(command, "load")) {
+            uart_puts("Available commands:\n");
+            uart_puts("  load - receives kernel.bin over UART\n");
+        } 
+        else if (streql(command, "load")) {
             uart_puts("Waiting for kernel.bin\n");
 
-            int magic, kernel_size;
+            uint32_t magic, kernel_size;
             uart_get_bytes((uint8_t *)&magic, sizeof(magic));
             uart_get_bytes((uint8_t *)&kernel_size, sizeof(kernel_size));
 
-            // 'BOOT'
+            // 'BOOT'`
             if (magic == 0x544F4F42) {
                 uart_puts("Receiving kernel...\n");
                 receive_kernel_bin(kernel_size);
             } else {
                 uart_puts("Failed to receive kernel\n");
             }
-        } else {
+        } 
+        else {
             uart_puts("Unknown command\n");
         }
     }
+}
+
+static void setup_uart() {
+    uintptr_t soc_node = fdt_node_addr_by_path(fdt_addr, "/soc");
+    struct fdt_property * soc_cell_address_cells_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, soc_node, "#address-cells")
+    );
+
+    uint32_t address_cells = be32_to_cpu(*(uint32_t *)(&soc_cell_address_cells_prop->data));
+
+    uintptr_t soc_serial_node = fdt_node_addr_by_path(fdt_addr, "/soc/serial");
+    struct fdt_property * serial_reg_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, soc_serial_node, "reg")
+    );
+
+    uintptr_t uart_base = address_cells == 1
+        ? be32_to_cpu(*(uint32_t *)(&serial_reg_prop->data))
+        : be64_to_cpu(*(uint64_t *)(&serial_reg_prop->data));
+
+    uart_setup(uart_base);
+}
+
+void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
+    hartid = _hartid;
+    fdt_addr = _fdt_addr;
+
+    setup_uart();
+    cli();
 }

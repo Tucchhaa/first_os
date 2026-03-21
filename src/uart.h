@@ -1,4 +1,8 @@
+#pragma once
+
 #include <stdint.h>
+
+void uart_setup(uintptr_t base_addr);
 
 uint8_t uart_get(void);
 void uart_get_bytes(uint8_t * buf, int n);

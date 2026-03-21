@@ -1,22 +1,27 @@
 #include "uart.h"
 #include "platform.h"
 
-volatile uint8_t * const uart_transm = (volatile uint8_t *)(UART_BASE);
-volatile uint8_t * const uart_status = (volatile uint8_t *)(UART_BASE + UART_STATUS_OFFSET);
+volatile uint8_t * _uart_base = 0;
+volatile uint8_t * _uart_status = 0;
+
+void uart_setup(uintptr_t base_addr) {
+    _uart_base = (uint8_t *)base_addr;
+    _uart_status = (uint8_t *)(base_addr + UART_STATUS_OFFSET);
+}
 
 // Transmit Holding Register Empty
 static inline int uart_status_thre(void) {
-    return !!(*uart_status & (1u << 5));
+    return !!(*_uart_status & (1u << 5));
 }
 
 // Data ready
 static inline int uart_status_dr(void) {
-    return !!(*uart_status & (1u << 0));
+    return !!(*_uart_status & (1u << 0));
 }
 
 uint8_t uart_get(void) {
     while(!uart_status_dr()) { }
-    return *uart_transm;
+    return *_uart_base;
 }
 
 void uart_get_bytes(uint8_t * buf, int n) {
@@ -27,7 +32,7 @@ void uart_get_bytes(uint8_t * buf, int n) {
 
 void uart_put(uint8_t b) {
     while(!uart_status_thre()) { }
-    *uart_transm = b;
+    *_uart_base = b;
 }
 
 void uart_puts(const char * str) {

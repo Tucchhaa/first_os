@@ -116,7 +116,9 @@ class BootLoader(Project):
             "src/bootloader/entry.S",
             "src/bootloader/bootloader.c",
             "src/uart.c",
-            "src/string.c"
+            "src/string.c",
+            "src/fdt.c",
+            "src/utils.c"
         ]
 
     def create_fit_image(self):
@@ -150,7 +152,9 @@ class Kernel(Project):
             "src/kernel/kmain.c",
             "src/uart.c",
             "src/sbi.c",
-            "src/string.c"
+            "src/string.c",
+            "src/fdt.c",
+            "src/utils.c"
         ]
 
 main()

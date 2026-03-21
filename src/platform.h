@@ -1,5 +1,4 @@
-#ifndef __PLATFORM__
-#define __PLATFORM__
+#pragma once
 
 #if defined(PLATFORM_QEMU)
     #include "../platform/qemu/include.h"
@@ -7,6 +6,4 @@
     #include "../platform/opirv2/include.h"
 #else
     #error "No platform defined!"
-#endif
-
 #endif
