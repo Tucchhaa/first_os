@@ -1,3 +1,5 @@
+#include <stdarg.h>
+
 #include "uart.h"
 #include "platform.h"
 
@@ -40,6 +42,20 @@ void uart_puts(const char * str) {
         if (str[i] == '\n') uart_put('\r');
         uart_put(str[i]);
     }
+}
+
+void uart_puts_variadic(const char * first, ...) {
+    va_list args;
+    va_start(args, first);
+
+    const char * arg = first;
+
+    while (arg != 0) {
+        uart_puts(arg);
+        arg = va_arg(args, const char *);
+    }
+
+    va_end(args);
 }
 
 void uart_getline(char * buf, int n) {

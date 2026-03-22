@@ -32,7 +32,6 @@ def main():
     # Build
     bootloader = BootLoader(args.platform)
     bootloader.build()
-    bootloader.create_fit_image()
 
     kernel = Kernel(args.platform)
     kernel.build()
@@ -120,33 +119,63 @@ class BootLoader(Project):
             "src/fdt.c",
             "src/utils.c"
         ]
+        self.ramdisk = "./src/kernel/ramdisk" # TODO: load ramdisk with the kernel instead of the bootloader
 
     def create_fit_image(self):
+        print("=> Creating INITRAMFS")
+        initramfs_path = os.path.join(BUILD_DIR, "initramfs.cpio")
+        initramfs_copy_path = os.path.join(self.platform_dir, "initramfs.cpio")
+
+        # pipe find output to cpio to create initramfs.cpio
+        with open(initramfs_path, "wb") as out_file:
+            find_proc = subprocess.Popen(
+                ["find", ".", "-print0"], 
+                stdout=subprocess.PIPE,
+                cwd=self.ramdisk
+            )
+            cpio_proc = subprocess.run(
+                ["cpio", "-o", "-0", "-H", "newc"],
+                stdin=find_proc.stdout,
+                stdout=out_file,
+                cwd=self.ramdisk
+            )
+            find_proc.stdout.close()
+            find_proc.wait()
+
+            if find_proc.returncode != 0 or cpio_proc.returncode != 0:
+                sys.exit(1)
+
         print("=> Creating FIT image")
         its_path = os.path.join(self.platform_dir, "bootloader.its")
 
         if not os.path.exists(its_path):
             print(f"{its_path} not found, skipping FIT image creation")
             return
-
-        # Copy bin to platform dir for mkimage to find it
+        
+        # Copy initramfs and bin to platform dir for mkimage to find it
         bin_path = os.path.join(BUILD_DIR, f"{self.name}.bin")
         bin_copy_path = os.path.join(self.platform_dir, f"{self.name}.bin")
-        
-        os.system(f"cp {bin_path} {bin_copy_path}")
 
-        # Create FIT image
+        os.system(f"cp {bin_path} {bin_copy_path}")
+        os.system(f"cp {initramfs_path} {initramfs_copy_path}")
 
         fit_path = os.path.join(BUILD_DIR, f"{self.name}.fit")
         cmd = ["mkimage", "-f", its_path, fit_path]
 
-        execute(cmd, cleanup=lambda: os.remove(bin_copy_path))
+        cleanup = lambda: os.remove(bin_copy_path) or os.remove(initramfs_copy_path)
+
+        execute(cmd, cleanup=cleanup)
+
+    def build(self):
+        super().build()
+        self.create_fit_image()
+
 
 class Kernel(Project):
     def __init__(self, platform):
         super().__init__(platform)
         self.name = "kernel"
-        self.linker_script = "linker.ld"
+        self.linker_script = "linker_kernel.ld"
         self.source_files = [
             "src/kernel/entry.S",
             "src/kernel/kmain.c",
@@ -154,7 +183,8 @@ class Kernel(Project):
             "src/sbi.c",
             "src/string.c",
             "src/fdt.c",
-            "src/utils.c"
+            "src/utils.c",
+            "src/kernel/initrd.c"
         ]
 
 main()

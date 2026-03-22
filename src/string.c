@@ -67,3 +67,66 @@ void i32tox(int32_t x, char * const buf) { return _itox(x, buf, 8); }
 
 // buf must have size 3
 void i8tox(int8_t x, char * const buf) { return _itox(x, buf, 2); }
+
+// buf must have size 8
+uint32_t xtoi32(char * const buf) {
+    uint32_t result = 0;
+    uint32_t i = 0;
+
+    while (buf[i] != '\0' && i < sizeof(uint32_t) * 2) {
+        char c = buf[i];
+        uint8_t digit;
+
+        if (c >= '0' && c <= '9') {
+            digit = c - '0';
+        } else if (c >= 'a' && c <= 'f') {
+            digit = 10 + (c - 'a');
+        } else if (c >= 'A' && c <= 'F') {
+            digit = 10 + (c - 'A');
+        } else {
+            break;
+        }
+
+        result = (result << 4) | digit;
+        i++;
+    }
+
+    return result;
+}
+
+// buf size must be at least 12
+void i32toa(int32_t x, char * const buf) {
+    if (x == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
+    }
+
+    int64_t value = x;
+    uint8_t is_negative = 0;
+
+    if (value < 0) {
+        is_negative = 1;
+        value = -value;
+    }
+
+    char digits[10];
+    uint32_t n = 0;
+
+    while (value > 0) {
+        digits[n++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    uint32_t i = 0;
+
+    if (is_negative) {
+        buf[i++] = '-';
+    }
+
+    while (n > 0) {
+        buf[i++] = digits[--n];
+    }
+
+    buf[i] = '\0';
+}

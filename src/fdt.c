@@ -1,5 +1,3 @@
-#include <stdint.h>
-
 #include "fdt.h"
 #include "string.h"
 #include "utils.h"
@@ -132,7 +130,11 @@ uintptr_t _fdt_next_property_addr(uintptr_t addr) {
     return 0;
 }
 
-inline struct fdt_property * fdt_property_at_addr(uintptr_t propert_addr) {
+struct fdt_property * fdt_property_at_addr(uintptr_t propert_addr) {
+    if (propert_addr == 0) {
+        return 0;
+    }
+
     return (struct fdt_property *)(propert_addr + TOKEN_SIZE);
 }
 

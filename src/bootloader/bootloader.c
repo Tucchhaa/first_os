@@ -19,7 +19,7 @@ static void receive_kernel_bin(int kernel_size) {
         loaded_bytes_count += 1;
     }
 
-    // make sure that CPU committed all writes are finished before jumping to kernel
+    // make sure that all writes are finished before jumping to kernel
     asm volatile ("fence"   ::: "memory");
     asm volatile ("fence.i" ::: "memory");
 
@@ -27,36 +27,19 @@ static void receive_kernel_bin(int kernel_size) {
 }
 
 static void cli(void) {
-    const int command_max_size = 100;
-    char command[command_max_size];
-
-    uart_puts("cli\n");
-
     while(1) {
-        uart_puts("bootloader> ");
-        uart_getline(command, command_max_size);
+        uart_puts("Waiting for kernel.bin\n");
 
-        if (streql(command, "help")) {
-            uart_puts("Available commands:\n");
-            uart_puts("  load - receives kernel.bin over UART\n");
-        } 
-        else if (streql(command, "load")) {
-            uart_puts("Waiting for kernel.bin\n");
+        uint32_t magic, kernel_size;
+        uart_get_bytes((uint8_t *)&magic, sizeof(magic));
+        uart_get_bytes((uint8_t *)&kernel_size, sizeof(kernel_size));
 
-            uint32_t magic, kernel_size;
-            uart_get_bytes((uint8_t *)&magic, sizeof(magic));
-            uart_get_bytes((uint8_t *)&kernel_size, sizeof(kernel_size));
-
-            // 'BOOT'`
-            if (magic == 0x544F4F42) {
-                uart_puts("Receiving kernel...\n");
-                receive_kernel_bin(kernel_size);
-            } else {
-                uart_puts("Failed to receive kernel\n");
-            }
-        } 
-        else {
-            uart_puts("Unknown command\n");
+        // 'BOOT'`
+        if (magic == 0x544F4F42) {
+            uart_puts("Receiving kernel...\n");
+            receive_kernel_bin(kernel_size);
+        } else {
+            uart_puts("Failed to receive kernel\n");
         }
     }
 }

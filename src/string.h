@@ -14,3 +14,7 @@ void strslice(const char * s, char * buf, uint32_t index, uint32_t n);
 void i64tox(int64_t x, char * const buf);
 void i32tox(int32_t x, char * const buf);
 void i8tox(int8_t x, char * const buf);
+
+uint32_t xtoi32(char * const buf);
+
+void i32toa(int32_t, char * const buf);
