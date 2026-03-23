@@ -13,6 +13,7 @@ static void setup_uart(void);
 static void setup_initrd(void);
 
 static void command_info(void);
+static void command_testfdt(void);
 static void command_ls(void);
 static void command_cat(const char * command);
 
@@ -42,7 +43,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             command_info();
         }
         else if (streql(command, "testfdt")) {
-            // TODO
+            command_testfdt();
         }
         else if (streql(command, "ls")) {
             command_ls();
@@ -99,10 +100,10 @@ static void setup_initrd(void) {
 
     char buf[40];
     i64tox(initrd_start_addr, buf);
-    uart_puts_variadic("[KERNEL] initrd-start addr: ", buf, "\n", 0);
+    uart_puts_variadic("[KERNEL] initrd-start addr: 0x", buf, "\n", 0);
 
     i64tox(initrd_end_addr, buf);
-    uart_puts_variadic("[KERNEL] initrd-end addr: ", buf, "\n", 0);
+    uart_puts_variadic("[KERNEL] initrd-end addr: 0x", buf, "\n", 0);
 
     if (initrd_check_magic(initrd_start_addr)) {
         uart_puts("[KERNEL] initrd magic is correct\n");
@@ -131,6 +132,74 @@ static void command_info(void) {
     uart_puts_variadic("  implementation version: 0x", buf, "\n", 0);
     
     uart_puts("\n");
+}
+
+static void command_testfdt(void) {
+    // interrupt-controller node
+    uintptr_t interrupt_controller_node = fdt_node_addr_by_path(
+        fdt_addr, "/cpus/cpu@0/interrupt-controller"
+    );
+    struct fdt_property * compatible_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, interrupt_controller_node, "compatible")
+    );
+
+    if (compatible_prop == 0) {
+        uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
+    } else {
+        char buf[40];
+        i32toa(be32_to_cpu(compatible_prop->len), buf);
+        uart_puts_variadic("property data len: ", buf, "\n\n", 0);
+
+        uart_puts("compatible: ");
+
+        uint32_t i = 0;
+
+        while (i < be32_to_cpu(compatible_prop->len)) {
+            uart_put(((const char *)&compatible_prop->data)[i]);
+            i += 1;
+        }
+        uart_puts("\n");
+    }
+
+    // memory node
+    uintptr_t root_node = fdt_node_addr_by_path(fdt_addr, "/");
+    struct fdt_property * address_cells_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, root_node, "#address-cells")
+    );
+    uint32_t address_cells = be32_to_cpu(*(uint32_t *)(&address_cells_prop->data));
+
+    struct fdt_property * size_cells_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, root_node, "#size-cells")
+    );
+    uint32_t size_cells = be32_to_cpu(*(uint32_t *)(&size_cells_prop->data));
+
+    uintptr_t memory_node = fdt_node_addr_by_path(
+        fdt_addr, "/memory"
+    );
+
+    struct fdt_property * reg_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, memory_node, "reg")
+    );
+
+    if (reg_prop == 0) {
+        uart_puts("/memory[reg] - not found\n");
+    } else {
+        uint64_t memory_base = address_cells == 1
+            ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
+            : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
+
+        uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
+
+        uint64_t memory_size = address_cells == 1
+            ? be32_to_cpu(*(uint32_t *)size_addr)
+            : be64_to_cpu(*(uint64_t *)size_addr);
+
+        char buf1[40], buf2[40];
+        i64tox(memory_base, buf1);
+        i64tox(memory_size, buf2);
+
+        uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
+    }
 }
 
 static void command_ls(void) {
