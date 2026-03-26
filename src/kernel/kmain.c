@@ -20,6 +20,10 @@ static void command_cat(const char * command);
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     fdt_addr = _fdt_addr;
 
+    if (fdt_check_magic(fdt_addr) == 0) {
+        return;
+    }
+
     setup_uart();
     setup_initrd();
     uart_puts("\n");
@@ -184,13 +188,13 @@ static void command_testfdt(void) {
     if (reg_prop == 0) {
         uart_puts("/memory[reg] - not found\n");
     } else {
-        uint64_t memory_base = address_cells == 1
+        uintptr_t memory_base = address_cells == 1
             ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
             : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
 
         uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
 
-        uint64_t memory_size = address_cells == 1
+        uintptr_t memory_size = address_cells == 1
             ? be32_to_cpu(*(uint32_t *)size_addr)
             : be64_to_cpu(*(uint64_t *)size_addr);
 
@@ -199,6 +203,16 @@ static void command_testfdt(void) {
         i64tox(memory_size, buf2);
 
         uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
+    }
+
+    // initrd
+    if (initrd_start_addr == 0) {
+        uart_puts("/chosen[linux,initrd-start] - not found\n");
+    } else {
+        char buf1[40], buf2[40];
+        i64tox(initrd_start_addr, buf1);
+        i64tox(initrd_end_addr, buf2);
+        uart_puts_variadic("initrd: start=0x", buf1, " end=0x", buf2, "\n", 0);
     }
 }
 

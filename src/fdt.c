@@ -3,7 +3,7 @@
 #include "utils.h"
 
 /*
-Token values are already converted from bid-endian to little-endian
+Token values are already converted from big-endian to little-endian
 */
 static const uint32_t FDT_TOKEN_BEGIN_NODE = 0x01000000;
 static const uint32_t FDT_TOKEN_END_NODE = 0x02000000;

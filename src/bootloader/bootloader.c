@@ -68,6 +68,10 @@ void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
     hartid = _hartid;
     fdt_addr = _fdt_addr;
 
+    if (fdt_check_magic(fdt_addr) == 0) {
+        return;
+    }
+
     setup_uart();
     cli();
 }
