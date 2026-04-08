@@ -4,6 +4,7 @@
 #include "../fdt.h"
 #include "../utils.h"
 #include "mm/page_allocator.h"
+#include "mm/dynamic_allocator.h"
 #include "initrd.h"
 
 extern char __kernel_start;
@@ -25,6 +26,7 @@ static void command_info(void);
 static void command_testfdt(void);
 static void command_ls(void);
 static void command_cat(const char * command);
+static void command_testmm(void);
 
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     fdt_addr = _fdt_addr;
@@ -53,6 +55,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("  ls - print file system.\n");
             uart_puts("  cat <filepath> - print contents of a file.\n");
             uart_puts("  testfdt - test fdt parser.\n");
+            uart_puts("  testmm - test memory allocator.\n");
         } 
         else if (streql(command, "info")) {
             command_info();
@@ -65,6 +68,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         }
         else if (streqln(command, "cat ", 4)) {
             command_cat(command);
+        }
+        else if (streql(command, "testmm")) {
+            command_testmm();
         }
         else {
             uart_puts("Unknown command\n");
@@ -164,7 +170,7 @@ static void setup_memory(void) {
         char buf1[32], buf2[32];
         i64tox(memory_base, buf1);
         i64tox(memory_size, buf2);
-        uart_puts_variadic("[KERNEL] insert memory. base: ", buf1, ", size: ", buf2, "\n", 0);
+        uart_puts_variadic("[KERNEL] insert memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
 
         memory_insert(memory_base, memory_size);
     }
@@ -173,20 +179,6 @@ static void setup_memory(void) {
         uint64_t fdt_size = fdt_total_size(fdt_addr);
         uint64_t initrd_size = initrd_end_addr - initrd_start_addr;
         uint64_t kernel_size = (uint64_t)&__kernel_end - (uint64_t)&__kernel_start;
-
-        char buf1[32], buf2[32];
-
-        i64tox(fdt_addr, buf1);
-        i64tox(fdt_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve memory for FDT. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
-
-        i64tox(initrd_start_addr, buf1);
-        i64tox(initrd_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve memory for initrd. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
-
-        i64tox((uint64_t)&__kernel_start, buf1);
-        i64tox(kernel_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve memory for kernel. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
 
         memory_reserve(fdt_addr, fdt_size);
         memory_reserve(initrd_start_addr, initrd_size);
@@ -214,22 +206,25 @@ static void setup_memory(void) {
 
                 memory_reserve(address, size);
 
-                char buf1[32], buf2[32];
-                i64tox(address, buf1);
-                i64tox(size, buf2);
-                uart_puts_variadic(
-                    "[KERNEL] reserve memory @reserved-memory/" , fdt_node_name(current_node), 
-                    ". base: 0x", buf1, ", size: 0x", buf2, "\n", 0
-                );
-
                 current_node = fdt_sibling_node(current_node);
             }
         }
     }
 
     memory_init();
+    dynamic_allocator_init();
 
     uart_puts("[KERNEL] Done setting up memory\n");
+
+    /*
+    TODO:
+    - allocate memory for frame array dynamically
+    - test on orange pi
+    - support multiple memory regions
+    - clean up the kmain.c
+    - optimize page allocator
+    - use single linked list
+    */
 }
 
 static void command_info(void) {
@@ -388,4 +383,54 @@ static void command_cat(const char * command) {
     }
 
     uart_puts("File not found\n\n");
+}
+
+static void command_testmm() {
+    uart_puts("Testing memory allocation...\n");
+    char *ptr1 = (char *)allocate(4000);
+    char *ptr2 = (char *)allocate(8000);
+    char *ptr3 = (char *)allocate(4000);
+    char *ptr4 = (char *)allocate(4000);
+
+    free(ptr1);
+    free(ptr2);
+    free(ptr3);
+    free(ptr4);
+
+    /* Test kmalloc */
+    uart_puts("Testing dynamic allocator...\n");
+    char *kmem_ptr1 = (char *)allocate(16);
+    char *kmem_ptr2 = (char *)allocate(32);
+    char *kmem_ptr3 = (char *)allocate(64);
+    char *kmem_ptr4 = (char *)allocate(128);
+
+    free(kmem_ptr1);
+    free(kmem_ptr2);
+    free(kmem_ptr3);
+    free(kmem_ptr4);
+
+    char *kmem_ptr5 = (char *)allocate(16);
+    char *kmem_ptr6 = (char *)allocate(32);
+
+    free(kmem_ptr5);
+    free(kmem_ptr6);
+
+    // Test allocate new page if the cache is not enough
+    void *kmem_ptr[102];
+    for (int i=0; i<25; i++) {
+        kmem_ptr[i] = (char *)allocate(512);
+    }
+    for (int i=0; i<25; i++) {
+        free(kmem_ptr[i]);
+    }
+
+    // Test exceeding the maximum size
+    char *kmem_ptr7 = (char *)allocate(1 << 31);
+    if (kmem_ptr7 == 0) {
+        uart_puts("Allocation failed as expected for size > MAX_ALLOC_SIZE\n");
+    }
+    else {
+        uart_puts("Unexpected allocation success for size > MAX_ALLOC_SIZE\n");
+        free(kmem_ptr7);
+    }
 }

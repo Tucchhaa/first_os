@@ -7,13 +7,6 @@
 // 16GB
 #define MAX_ORDERS 22
 
-const uint32_t PAGE_SIZE = 4096; // 4kb
-
-struct page {
-    uint8_t order;
-    uint8_t flags;
-};
-
 const uint8_t PAGE_FREE = 1 << 0;
 const uint8_t PAGE_ALLOCATED = 1 << 1;
 const uint8_t PAGE_RESERVED = 1 << 2;
@@ -25,35 +18,71 @@ struct linked_list orders_lists[MAX_ORDERS];
 
 uintptr_t memory_base_addr;
 
-uint8_t need_log_status = 0;
-void _log_status() {
-    if (need_log_status == 0) {
-        return;
-    }
-
-    for (int i=0; i < MAX_ORDERS; i++) {
-        uint32_t count = 0;
-        struct linked_list_node * current_node = orders_lists[i].head;
-
-        while (current_node != 0) {
-            count += 1;
-            current_node = current_node->next;
-        }
-
-        char buf1[32], buf2[32];
-        i32toa(i, buf1);
-        i32toa(count, buf2);
-
-        uart_puts_variadic("order ", buf1, ": ", buf2, " nodes\n", 0);
-    }
-}
+uint8_t need_logging = 0;
 
 static inline uint32_t _get_page_index(uintptr_t page_addr) {
     // TODO: convert to bit operation
     return (page_addr - memory_base_addr) / PAGE_SIZE;
 }
 
-static struct page * _get_page(uintptr_t page_addr) {
+void _log_page_add(uintptr_t page_addr, uint32_t order) {
+    if (!need_logging) return;
+
+    char b1[40], b2[40], b3[40];
+    i32toa(_get_page_index(page_addr), b1);
+    i64tox(page_addr, b2);
+    i32toa(order, b3);
+    uart_puts_variadic("[+] Add page ", b1, " at address 0x", b2, " to order ", b3, "\n", 0);
+}
+
+void _log_page_remove(uintptr_t page_addr, uint32_t order) {
+    if (!need_logging) return;
+
+    char b1[40], b2[40], b3[40];
+    i32toa(_get_page_index(page_addr), b1);
+    i64tox(page_addr, b2);
+    i32toa(order, b3);
+    uart_puts_variadic("[-] Remove page ", b1, " at address 0x", b2, " from order ", b3, "\n", 0);
+}
+
+void _log_buddy_found(uintptr_t page_addr, uintptr_t buddy_addr, uint32_t order) {
+    if (!need_logging) return;
+
+    char b1[40], b2[40], b3[40];
+    i32toa(_get_page_index(buddy_addr), b1);
+    i32toa(_get_page_index(page_addr), b2);
+    i32toa(order, b3);
+    uart_puts_variadic("[*] Buddy found! buddy idx: ", b1, " for page ", b2, " with order ", b3, "\n", 0);
+}
+
+void _log_page_allocate(uintptr_t page_addr, uint32_t order) {
+    if (!need_logging) return;
+
+    char b1[40], b2[40], b3[40];
+    i64tox(page_addr, b1);
+    i32toa(order, b2);
+    i32toa(_get_page_index(page_addr), b3);
+    uart_puts_variadic("[Page] Allocate 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+}
+
+void _log_page_free(uintptr_t page_addr, uint32_t order) {
+    if (!need_logging) return;
+
+    char b1[40], b2[40], b3[40];
+    i64tox(page_addr, b1);
+    i32toa(order, b2);
+    i32toa(_get_page_index(page_addr), b3);
+    uart_puts_variadic("[Page] Free 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+}
+
+void _log_reserve(uintptr_t addr, uint64_t size) {
+    char b1[40], b2[40];
+    i64tox(addr, b1);
+    i64tox(addr + size, b2);
+    uart_puts_variadic("[Reserve] Reserve address [0x", b1, ", 0x", b2, ")\n", 0);
+}
+
+struct page * memory_page_metadata(uintptr_t page_addr) {
     uint32_t page_index = _get_page_index(page_addr);
 
     if (page_index >= frame_array_size) {
@@ -84,11 +113,10 @@ void memory_init() {
         }
 
         uintptr_t page_addr = memory_base_addr + i * PAGE_SIZE;
-        memory_free_pages(page_addr);
+        memory_free_pages((void *)page_addr);
     }
 
-    need_log_status = 1;
-    _log_status();
+    need_logging = 1;
 }
 
 void memory_insert(uintptr_t addr, uint64_t size) {
@@ -97,15 +125,18 @@ void memory_insert(uintptr_t addr, uint64_t size) {
 }
 
 void memory_reserve(uintptr_t addr, uint64_t size) {
+    _log_reserve(addr, size);
+
+    uint32_t reserved_page_num = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     uint32_t index_offset = _get_page_index(addr);
 
-    for (uint32_t i = 0; i < size / PAGE_SIZE; i++) {
+    for (uint32_t i = 0; i < reserved_page_num; i++) {
         frame_array[index_offset + i].order = 0;
         frame_array[index_offset + i].flags = PAGE_RESERVED;
     }
 }
 
-uintptr_t memory_allocate_pages(uint64_t size) {
+void * memory_allocate_pages(uint64_t size) {
     uint32_t required_order = 0;
     uint64_t current_size = PAGE_SIZE;
 
@@ -126,7 +157,10 @@ uintptr_t memory_allocate_pages(uint64_t size) {
 
     uintptr_t block_addr = (uintptr_t)orders_lists[order].head;
 
+    _log_page_allocate(block_addr, order);
+
     linked_list_remove(&orders_lists[order], orders_lists[order].head);
+    _log_page_remove(block_addr, order);
 
     while (order > required_order) {
         order -= 1;
@@ -134,46 +168,50 @@ uintptr_t memory_allocate_pages(uint64_t size) {
 
         linked_list_insert(&orders_lists[order], (struct linked_list_node *)buddy_addr);
 
-        struct page * buddy_page = _get_page(buddy_addr); 
+        struct page * buddy_page = memory_page_metadata(buddy_addr); 
         buddy_page->order = order;
         buddy_page->flags = PAGE_FREE;
+
+        _log_page_add(buddy_addr, order);
     }
 
-    struct page * page = _get_page(block_addr);
+    struct page * page = memory_page_metadata(block_addr);
     page->order = order;
     page->flags = PAGE_ALLOCATED;
 
-    _log_status();
-
-    return block_addr;
+    return (void *)block_addr;
 }
 
 static struct linked_list_node * _get_buddy(uintptr_t block_addr, uint8_t order) {
     uintptr_t offset = block_addr - memory_base_addr;
     uintptr_t buddy_addr = (offset ^ (PAGE_SIZE << order)) + memory_base_addr;
 
-    struct page * buddy_page = _get_page(buddy_addr);
+    struct page * buddy_page = memory_page_metadata(buddy_addr);
 
     if (buddy_page == 0) {
         return 0;
     }
 
     if ((buddy_page->flags & PAGE_FREE) && buddy_page->order == order) {
+        _log_buddy_found(block_addr, buddy_addr, order);
+
         return (struct linked_list_node *)buddy_addr;
     }
 
     return 0;
 }
 
-void memory_free_pages(uintptr_t block_addr) {
-    struct page * page = _get_page(block_addr);
+void memory_free_pages(void * block_addr) {
+    struct page * page = memory_page_metadata((uintptr_t)block_addr);
 
     if (page == 0) {
         return;
     }
 
     uint8_t order = page->order;
-    uintptr_t new_block_addr = block_addr;
+    uintptr_t new_block_addr = (uintptr_t)block_addr;
+
+    _log_page_free(new_block_addr, order);
 
     while (order < MAX_ORDERS - 1) {
         struct linked_list_node * buddy = _get_buddy(new_block_addr, order);
@@ -183,6 +221,7 @@ void memory_free_pages(uintptr_t block_addr) {
         }
 
         linked_list_remove(&orders_lists[order], buddy);
+        _log_page_remove((uintptr_t)buddy, order);
 
         new_block_addr = (uintptr_t)buddy < new_block_addr ? (uintptr_t)buddy : new_block_addr;
         order += 1;
@@ -190,9 +229,9 @@ void memory_free_pages(uintptr_t block_addr) {
 
     linked_list_insert(&orders_lists[order], (struct linked_list_node *)new_block_addr);
 
-    struct page * new_page = _get_page(new_block_addr);
+    struct page * new_page = memory_page_metadata(new_block_addr);
     new_page->order = order;
     new_page->flags = PAGE_FREE;
 
-    _log_status();
+    _log_page_add(new_block_addr, order);
 }

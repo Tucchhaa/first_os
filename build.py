@@ -187,6 +187,7 @@ class Kernel(Project):
             "src/kernel/initrd.c",
             "src/kernel/ds/linked_list.c",
             "src/kernel/mm/page_allocator.c",
+            "src/kernel/mm/dynamic_allocator.c"
         ]
 
 main()
