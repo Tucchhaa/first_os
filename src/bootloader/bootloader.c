@@ -34,7 +34,7 @@ static void cli(void) {
         uart_get_bytes((uint8_t *)&magic, sizeof(magic));
         uart_get_bytes((uint8_t *)&kernel_size, sizeof(kernel_size));
 
-        // 'BOOT'`
+        // 'BOOT'
         if (magic == 0x544F4F42) {
             uart_puts("Receiving kernel...\n");
             receive_kernel_bin(kernel_size);

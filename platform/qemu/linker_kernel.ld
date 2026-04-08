@@ -8,6 +8,7 @@ MEMORY
 SECTIONS
 {
     . = ORIGIN(RAM);
+    __kernel_start = .;
 
     .text : { 
         *(.text.init)
@@ -29,4 +30,5 @@ SECTIONS
     } > RAM
 
     __stack_top = ORIGIN(RAM) + LENGTH(RAM);
+    __kernel_end = __stack_top;
 }

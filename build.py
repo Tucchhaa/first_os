@@ -184,7 +184,9 @@ class Kernel(Project):
             "src/string.c",
             "src/fdt.c",
             "src/utils.c",
-            "src/kernel/initrd.c"
+            "src/kernel/initrd.c",
+            "src/kernel/ds/linked_list.c",
+            "src/kernel/mm/page_allocator.c",
         ]
 
 main()

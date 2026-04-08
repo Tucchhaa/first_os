@@ -3,14 +3,23 @@
 #include "../string.h"
 #include "../fdt.h"
 #include "../utils.h"
+#include "mm/page_allocator.h"
 #include "initrd.h"
 
+extern char __kernel_start;
+extern char __kernel_end;
+
 uintptr_t fdt_addr;
+
+struct fdt_node_cells fdt_cells;
+
 uintptr_t initrd_start_addr;
 uintptr_t initrd_end_addr;
 
 static void setup_uart(void);
+static void read_fdt(void);
 static void setup_initrd(void);
+static void setup_memory(void);
 
 static void command_info(void);
 static void command_testfdt(void);
@@ -25,7 +34,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 
     setup_uart();
+    read_fdt();
     setup_initrd();
+    setup_memory();
     uart_puts("\n");
     
     const int command_max_size = 100;
@@ -61,20 +72,30 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 }
 
+static void read_fdt(void) {
+    uart_puts("[KERNEL] Reading FDT");
+
+    uintptr_t root_node_addr = fdt_node_addr_by_path(fdt_addr, "/");
+    fdt_cells = fdt_get_node_cells(fdt_addr, root_node_addr);
+
+    if (fdt_cells.error) {
+        uart_puts("[KERNEL:ERROR] Could not get soc node cells\n");
+
+        // Fallback
+        fdt_cells.address = 2;
+        fdt_cells.size = 2;
+    } else {
+        uart_puts("[KERNEL] Reading FDT done");
+    }
+}
+
 static void setup_uart(void) {
-    uintptr_t soc_node = fdt_node_addr_by_path(fdt_addr, "/soc");
-    struct fdt_property * soc_cell_address_cells_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, soc_node, "#address-cells")
-    );
-
-    uint32_t address_cells = be32_to_cpu(*(uint32_t *)(&soc_cell_address_cells_prop->data));
-
     uintptr_t soc_serial_node = fdt_node_addr_by_path(fdt_addr, "/soc/serial");
     struct fdt_property * serial_reg_prop = fdt_property_at_addr(
         fdt_property_addr_by_name(fdt_addr, soc_serial_node, "reg")
     );
 
-    uintptr_t uart_base = address_cells == 1
+    uintptr_t uart_base = fdt_cells.address == 1
         ? be32_to_cpu(*(uint32_t *)(&serial_reg_prop->data))
         : be64_to_cpu(*(uint64_t *)(&serial_reg_prop->data));
 
@@ -114,6 +135,101 @@ static void setup_initrd(void) {
     } else {
         uart_puts("[KERNEL] initrd magic is not correct\n");
     }
+}
+
+static void setup_memory(void) {
+    uart_puts("[KERNEL] Setting up memory\n");
+
+    // TODO: support several memory nodes
+    uintptr_t memory_node_addr = fdt_node_addr_by_path(fdt_addr, "/memory");
+    uintptr_t device_type_prop_addr = fdt_property_addr_by_name(fdt_addr, memory_node_addr, "device_type");
+    struct fdt_property * device_type_prop = fdt_property_at_addr(device_type_prop_addr);
+
+    if (
+        device_type_prop == 0
+        || streql("memory", &device_type_prop->data) == 0
+    ) {
+        uart_puts("[KERNEL:ERROR] Unable to find memory node in FDT\n");
+        return;
+    }
+
+    {
+        uint64_t memory_base = 0, memory_size = 0;
+
+        fdt_read_reg_property(
+            fdt_addr, memory_node_addr, fdt_cells.address, fdt_cells.size,
+            &memory_base, &memory_size
+        );
+
+        char buf1[32], buf2[32];
+        i64tox(memory_base, buf1);
+        i64tox(memory_size, buf2);
+        uart_puts_variadic("[KERNEL] insert memory. base: ", buf1, ", size: ", buf2, "\n", 0);
+
+        memory_insert(memory_base, memory_size);
+    }
+
+    {
+        uint64_t fdt_size = fdt_total_size(fdt_addr);
+        uint64_t initrd_size = initrd_end_addr - initrd_start_addr;
+        uint64_t kernel_size = (uint64_t)&__kernel_end - (uint64_t)&__kernel_start;
+
+        char buf1[32], buf2[32];
+
+        i64tox(fdt_addr, buf1);
+        i64tox(fdt_size, buf2);
+        uart_puts_variadic("[KERNEL] reserve memory for FDT. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+
+        i64tox(initrd_start_addr, buf1);
+        i64tox(initrd_size, buf2);
+        uart_puts_variadic("[KERNEL] reserve memory for initrd. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+
+        i64tox((uint64_t)&__kernel_start, buf1);
+        i64tox(kernel_size, buf2);
+        uart_puts_variadic("[KERNEL] reserve memory for kernel. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+
+        memory_reserve(fdt_addr, fdt_size);
+        memory_reserve(initrd_start_addr, initrd_size);
+        memory_reserve((uint64_t)&__kernel_start, kernel_size);
+    }
+
+    {
+        uintptr_t reserved_memory_node_addr = fdt_node_addr_by_path(fdt_addr, "/reserved-memory");
+
+        if (reserved_memory_node_addr) {
+            uintptr_t current_node = fdt_child_node(reserved_memory_node_addr);
+
+            while (current_node != 0) {
+                struct fdt_property * reg_prop = fdt_property_at_addr(
+                    fdt_property_addr_by_name(fdt_addr, current_node, "reg")
+                );
+
+                uint64_t address, size;
+
+                fdt_read_reg_property(
+                    fdt_addr, current_node,
+                    fdt_cells.address, fdt_cells.size,
+                    &address, &size
+                );
+
+                memory_reserve(address, size);
+
+                char buf1[32], buf2[32];
+                i64tox(address, buf1);
+                i64tox(size, buf2);
+                uart_puts_variadic(
+                    "[KERNEL] reserve memory @reserved-memory/" , fdt_node_name(current_node), 
+                    ". base: 0x", buf1, ", size: 0x", buf2, "\n", 0
+                );
+
+                current_node = fdt_sibling_node(current_node);
+            }
+        }
+    }
+
+    memory_init();
+
+    uart_puts("[KERNEL] Done setting up memory\n");
 }
 
 static void command_info(void) {
@@ -166,44 +282,21 @@ static void command_testfdt(void) {
     }
 
     // memory node
-    uintptr_t root_node = fdt_node_addr_by_path(fdt_addr, "/");
-    struct fdt_property * address_cells_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, root_node, "#address-cells")
-    );
-    uint32_t address_cells = be32_to_cpu(*(uint32_t *)(&address_cells_prop->data));
-
-    struct fdt_property * size_cells_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, root_node, "#size-cells")
-    );
-    uint32_t size_cells = be32_to_cpu(*(uint32_t *)(&size_cells_prop->data));
-
     uintptr_t memory_node = fdt_node_addr_by_path(
         fdt_addr, "/memory"
     );
 
-    struct fdt_property * reg_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, memory_node, "reg")
+    uint64_t memory_base = 0, memory_size = 0;
+    fdt_read_reg_property(
+        fdt_addr, memory_node, fdt_cells.address, fdt_cells.size,
+        &memory_base, &memory_size
     );
 
-    if (reg_prop == 0) {
-        uart_puts("/memory[reg] - not found\n");
-    } else {
-        uintptr_t memory_base = address_cells == 1
-            ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
-            : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
+    char buf1[32], buf2[32];
+    i64tox(memory_base, buf1);
+    i64tox(memory_size, buf2);
 
-        uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
-
-        uintptr_t memory_size = address_cells == 1
-            ? be32_to_cpu(*(uint32_t *)size_addr)
-            : be64_to_cpu(*(uint64_t *)size_addr);
-
-        char buf1[40], buf2[40];
-        i64tox(memory_base, buf1);
-        i64tox(memory_size, buf2);
-
-        uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
-    }
+    uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
 
     // initrd
     if (initrd_start_addr == 0) {

@@ -54,7 +54,12 @@ uint32_t fdt_check_magic(uintptr_t fdt) {
     return header->magic == be32_to_cpu(0xd00dfeed);
 }
 
-const char * _fdt_node_name(uintptr_t node_addr) {
+uint64_t fdt_total_size(uintptr_t fdt) {
+    struct fdt_header* header = (struct fdt_header*)fdt;
+    return be32_to_cpu(header->totalsize);
+}
+
+const char * fdt_node_name(uintptr_t node_addr) {
     return (const char *)(node_addr + TOKEN_SIZE);
 }
 
@@ -76,7 +81,7 @@ uintptr_t _fdt_root_node(uintptr_t fdt) {
     return _fdt_next_token_addr(start_addr);
 }
 
-uintptr_t _fdt_sibling_node(uintptr_t node_addr) {
+uintptr_t fdt_sibling_node(uintptr_t node_addr) {
     uintptr_t current_addr = node_addr;
     int32_t depth = 1;
 
@@ -92,6 +97,10 @@ uintptr_t _fdt_sibling_node(uintptr_t node_addr) {
         } 
         else if (*(uint32_t *)current_addr == FDT_TOKEN_END_NODE) {
             depth -= 1;
+
+            if (depth == -1) {
+                return 0;
+            }
         } 
         else if (*(uint32_t *)current_addr == FDT_TOKEN_END) {
             return 0;
@@ -99,7 +108,7 @@ uintptr_t _fdt_sibling_node(uintptr_t node_addr) {
     }
 }
 
-uintptr_t _fdt_child_node(uintptr_t node_addr) {
+uintptr_t fdt_child_node(uintptr_t node_addr) {
     uintptr_t current_addr = node_addr;
 
     while (1) {
@@ -149,7 +158,7 @@ uintptr_t fdt_node_addr_by_path(uintptr_t fdt, const char * path) {
     uint32_t q = 0;
 
     while (1) {
-        const char * current_node_name = _fdt_node_name(current_addr);
+        const char * current_node_name = fdt_node_name(current_addr);
 
         if (
             streqln(current_node_name, p, q) &&
@@ -167,10 +176,10 @@ uintptr_t fdt_node_addr_by_path(uintptr_t fdt, const char * path) {
                 return current_addr;
             }
 
-            current_addr = _fdt_child_node(current_addr);
+            current_addr = fdt_child_node(current_addr);
         } 
         else {
-            current_addr = _fdt_sibling_node(current_addr);
+            current_addr = fdt_sibling_node(current_addr);
         }
 
         if (current_addr == 0) {
@@ -184,6 +193,10 @@ uintptr_t fdt_property_addr_by_name(
     uintptr_t node_addr,
     const char * property_name
 ) {
+    if (node_addr == 0) {
+        return 0;
+    }
+
     uintptr_t current_addr = node_addr;
 
     while (1) {
@@ -200,4 +213,52 @@ uintptr_t fdt_property_addr_by_name(
             return current_addr;
         }
     }
+}
+
+struct fdt_node_cells fdt_get_node_cells(uintptr_t fdt, uintptr_t node_addr) {
+    struct fdt_node_cells result;
+
+    uintptr_t address_cells_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "#address-cells");
+    uintptr_t size_cells_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "#size-cells");
+
+    struct fdt_property * address_cells_prop = fdt_property_at_addr(address_cells_prop_addr);
+    struct fdt_property * size_cells_prop = fdt_property_at_addr(size_cells_prop_addr);
+    
+    if (address_cells_prop == 0 || size_cells_prop == 0) {
+        result.error = 1;
+        result.address = 0;
+        result.size = 0;
+        return result;
+    }
+
+    result.error = 0;
+    result.address = be32_to_cpu(*(uint32_t *)(&address_cells_prop->data));
+    result.size = be32_to_cpu(*(uint32_t *)(&size_cells_prop->data));
+
+    return result;
+}
+
+void fdt_read_reg_property(
+    uintptr_t fdt, uintptr_t node_addr, 
+    uint32_t address_cells, uint32_t size_cells,
+    uint64_t * address, uint64_t * size
+) {
+    uintptr_t reg_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "reg");
+    struct fdt_property * reg_prop = fdt_property_at_addr(reg_prop_addr);
+
+    if (reg_prop == 0) {
+        *address = 0;
+        *size = 0;
+        return;
+    }
+
+    *address = address_cells == 1
+        ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
+        : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
+
+    uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
+
+    *size = size_cells == 1
+        ? be32_to_cpu(*(uint32_t *)size_addr)
+        : be64_to_cpu(*(uint64_t *)size_addr);
 }
