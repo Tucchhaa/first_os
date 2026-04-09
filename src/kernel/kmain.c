@@ -27,6 +27,10 @@ static void command_testfdt(void);
 static void command_ls(void);
 static void command_cat(const char * command);
 static void command_testmm(void);
+static void command_testmm1(void);
+static void command_testmm2(void);
+static void command_testmm3(void);
+static void command_testmm4(void);
 
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     fdt_addr = _fdt_addr;
@@ -38,7 +42,6 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     setup_uart();
     read_fdt();
     setup_initrd();
-    setup_memory();
     uart_puts("\n");
     
     const int command_max_size = 100;
@@ -55,6 +58,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("  ls - print file system.\n");
             uart_puts("  cat <filepath> - print contents of a file.\n");
             uart_puts("  testfdt - test fdt parser.\n");
+            uart_puts("  setupmm - setup memory allocator.\n");
             uart_puts("  testmm - test memory allocator.\n");
         } 
         else if (streql(command, "info")) {
@@ -68,6 +72,21 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         }
         else if (streqln(command, "cat ", 4)) {
             command_cat(command);
+        }
+        else if (streql(command, "setupmm")) {
+            setup_memory();
+        }
+        else if (streql(command, "testmm1")) {
+            command_testmm1();
+        }
+        else if (streql(command, "testmm2")) {
+            command_testmm2();
+        }
+        else if (streql(command, "testmm3")) {
+            command_testmm3();
+        }
+        else if (streql(command, "testmm4")) {
+            command_testmm4();
         }
         else if (streql(command, "testmm")) {
             command_testmm();
@@ -212,7 +231,7 @@ static void setup_memory(void) {
     }
 
     if (memory_init()) {
-        uart_puts("[KERNEL:ERROR] error occurred during memory init");
+        uart_puts("[KERNEL:ERROR] error occurred during memory init\n");
         return;
     }
     dynamic_allocator_init();
@@ -221,11 +240,11 @@ static void setup_memory(void) {
 
     /*
     TODO:
-    - test on orange pi
     - support multiple memory regions
     - clean up the kmain.c
     - optimize page allocator
     - use single linked list
+    - implement self relocating bootloader
     */
 }
 
@@ -387,7 +406,7 @@ static void command_cat(const char * command) {
     uart_puts("File not found\n\n");
 }
 
-static void command_testmm() {
+static void command_testmm1() {
     uart_puts("Testing memory allocation...\n");
     char *ptr1 = (char *)allocate(4000);
     char *ptr2 = (char *)allocate(8000);
@@ -398,7 +417,9 @@ static void command_testmm() {
     free(ptr2);
     free(ptr3);
     free(ptr4);
+}
 
+static void command_testmm2() {
     /* Test kmalloc */
     uart_puts("Testing dynamic allocator...\n");
     char *kmem_ptr1 = (char *)allocate(16);
@@ -416,7 +437,9 @@ static void command_testmm() {
 
     free(kmem_ptr5);
     free(kmem_ptr6);
+}
 
+static void command_testmm3() {
     // Test allocate new page if the cache is not enough
     void *kmem_ptr[102];
     for (int i=0; i<25; i++) {
@@ -425,7 +448,9 @@ static void command_testmm() {
     for (int i=0; i<25; i++) {
         free(kmem_ptr[i]);
     }
+}
 
+static void command_testmm4() {
     // Test exceeding the maximum size
     char *kmem_ptr7 = (char *)allocate(1 << 31);
     if (kmem_ptr7 == 0) {
@@ -435,4 +460,11 @@ static void command_testmm() {
         uart_puts("Unexpected allocation success for size > MAX_ALLOC_SIZE\n");
         free(kmem_ptr7);
     }
+}
+
+static void command_testmm() {
+    command_testmm1();
+    command_testmm2();
+    command_testmm3();
+    command_testmm4();
 }

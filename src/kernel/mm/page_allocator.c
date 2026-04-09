@@ -207,12 +207,18 @@ uint8_t memory_init() {
     memory_base_addr = available_memory[0].addr;
     frame_array = (struct page *)frame_array_addr;
     frame_array_length = page_count;
+
+    for (uint32_t i = 0; i < frame_array_length; i++) {
+        frame_array[i].flags = 0;
+        frame_array[i].order = 0;
+        frame_array[i].pool_index = 0;
+    }
     
     _memory_reserve_pages(frame_array_addr, frame_array_size);
 
     for (uint32_t i = 0; i < reserved_memory_length; i += 1) {
         if (reserved_memory[i].addr + reserved_memory[i].size > available_memory_end_addr) {
-            return 1;
+            continue;
         }
 
         if (reserved_memory[i].addr < memory_base_addr) {
