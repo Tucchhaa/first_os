@@ -12,11 +12,11 @@ struct page {
 
 struct page * memory_page_metadata(uintptr_t page_addr);
 
-void memory_init();
-
-void memory_insert(uintptr_t addr, uint64_t size);
+void memory_add(uintptr_t addr, uint64_t size);
 
 void memory_reserve(uintptr_t addr, uint64_t size);
+
+uint8_t memory_init();
 
 void * memory_allocate_pages(uint64_t size);
 

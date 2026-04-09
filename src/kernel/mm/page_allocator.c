@@ -7,12 +7,25 @@
 // 16GB
 #define MAX_ORDERS 22
 
-const uint8_t PAGE_FREE = 1 << 0;
-const uint8_t PAGE_ALLOCATED = 1 << 1;
-const uint8_t PAGE_RESERVED = 1 << 2;
+const uint8_t PAGE_FLAG_FREE = 1 << 0;
+const uint8_t PAGE_FLAG_ALLOCATED = 1 << 1;
+const uint8_t PAGE_FLAG_RESERVED = 1 << 2;
 
-uint32_t frame_array_size = 0;
-struct page frame_array[1500000];
+struct memory_region {
+    uintptr_t addr;
+    uint64_t size;
+};
+
+uint32_t available_memory_length = 0;
+uint32_t available_memory_max_length = 10;
+struct memory_region available_memory[10];
+
+uint32_t reserved_memory_length = 0;
+uint32_t reserved_memory_max_length = 10;
+struct memory_region reserved_memory[100];
+
+uint32_t frame_array_length = 0;
+struct page * frame_array;
 
 struct linked_list orders_lists[MAX_ORDERS];
 
@@ -82,49 +95,39 @@ void _log_reserve(uintptr_t addr, uint64_t size) {
     uart_puts_variadic("[Reserve] Reserve address [0x", b1, ", 0x", b2, ")\n", 0);
 }
 
+void memory_add(uintptr_t addr, uint64_t size) {
+    if (available_memory_length == available_memory_max_length) {
+        return;
+    }
+
+    available_memory[available_memory_length].addr = addr;
+    available_memory[available_memory_length].size = size;
+    
+    available_memory_length += 1;
+}
+
+void memory_reserve(uintptr_t addr, uint64_t size) {
+    if (reserved_memory_length == reserved_memory_max_length) {
+        return;
+    }
+
+    reserved_memory[reserved_memory_length].addr = addr;
+    reserved_memory[reserved_memory_length].size = size;
+
+    reserved_memory_length += 1;
+}
+
 struct page * memory_page_metadata(uintptr_t page_addr) {
     uint32_t page_index = _get_page_index(page_addr);
 
-    if (page_index >= frame_array_size) {
+    if (page_index >= frame_array_length) {
         return (void *)0;
     }
 
     return &frame_array[page_index];
 }
 
-void memory_init() {
-    for (uint32_t i = 0; i < MAX_ORDERS; i++) {
-        linked_list_init(&orders_lists[i]);
-    }
-
-    char b[32];
-    i32toa(frame_array_size, b);
-    uart_puts_variadic("frame array size: ", b, "\n", 0);
-
-    for (uint32_t i = 0; i < frame_array_size; i++) {
-        struct page * page = &frame_array[i];
-        
-        if (page->flags & PAGE_RESERVED) {
-            continue;
-        }
-
-        if (page->flags & PAGE_FREE) {
-            continue; // already freed
-        }
-
-        uintptr_t page_addr = memory_base_addr + i * PAGE_SIZE;
-        memory_free_pages((void *)page_addr);
-    }
-
-    need_logging = 1;
-}
-
-void memory_insert(uintptr_t addr, uint64_t size) {
-    memory_base_addr = addr;
-    frame_array_size = size / PAGE_SIZE;
-}
-
-void memory_reserve(uintptr_t addr, uint64_t size) {
+static void _memory_reserve_pages(uintptr_t addr, uint64_t size) {
     _log_reserve(addr, size);
 
     uint32_t reserved_page_num = (size + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -132,8 +135,98 @@ void memory_reserve(uintptr_t addr, uint64_t size) {
 
     for (uint32_t i = 0; i < reserved_page_num; i++) {
         frame_array[index_offset + i].order = 0;
-        frame_array[index_offset + i].flags = PAGE_RESERVED;
+        frame_array[index_offset + i].flags = PAGE_FLAG_RESERVED;
     }
+}
+
+static uintptr_t _allocate_frame_array(uint32_t frame_array_size) {
+    uintptr_t available_memory_end_addr = available_memory[0].addr + available_memory[0].size;
+    uintptr_t frame_array_addr = available_memory[0].addr;
+
+    while (1) {
+        uint8_t is_overlapping = 0;
+        uintptr_t frame_array_end_addr = frame_array_addr + frame_array_size;
+
+        for (uint32_t i = 0; i < reserved_memory_length; i += 1) {
+            uintptr_t reserved_memory_start_addr = reserved_memory[i].addr;
+            uintptr_t reserved_memory_end_addr = reserved_memory[i].addr + reserved_memory[i].size;
+
+            if (
+                frame_array_addr < reserved_memory_end_addr
+                && frame_array_end_addr > reserved_memory_start_addr
+            ) {
+                frame_array_addr = reserved_memory_end_addr;
+                is_overlapping = 1;
+                break;
+            }
+        }
+
+        if (frame_array_end_addr > available_memory_end_addr) {
+            return 0;
+        }
+
+        if (!is_overlapping) {
+            return frame_array_addr;
+        }
+    }
+}
+
+static void _populate_orders_lists() {
+    for (uint32_t i = 0; i < MAX_ORDERS; i++) {
+        linked_list_init(&orders_lists[i]);
+    }
+
+    for (uint32_t i = 0; i < frame_array_length; i++) {
+        struct page * page = &frame_array[i];
+        
+        if (page->flags & PAGE_FLAG_RESERVED) {
+            continue;
+        }
+
+        if (page->flags & PAGE_FLAG_FREE) {
+            continue; // already freed
+        }
+
+        uintptr_t page_addr = memory_base_addr + i * PAGE_SIZE;
+        memory_free_pages((void *)page_addr);
+    }
+}
+
+uint8_t memory_init() {
+    // TODO: support multiple available memory regions
+    uintptr_t available_memory_end_addr = available_memory[0].addr + available_memory[0].size;
+    uint32_t page_count = available_memory->size / PAGE_SIZE;
+
+    uint32_t frame_array_size = sizeof(struct page) * page_count;
+    uintptr_t frame_array_addr = _allocate_frame_array(frame_array_size);
+
+    if (frame_array_addr == 0) {
+        return 1;
+    }
+
+    memory_base_addr = available_memory[0].addr;
+    frame_array = (struct page *)frame_array_addr;
+    frame_array_length = page_count;
+    
+    _memory_reserve_pages(frame_array_addr, frame_array_size);
+
+    for (uint32_t i = 0; i < reserved_memory_length; i += 1) {
+        if (reserved_memory[i].addr + reserved_memory[i].size > available_memory_end_addr) {
+            return 1;
+        }
+
+        if (reserved_memory[i].addr < memory_base_addr) {
+            continue;
+        }
+
+        _memory_reserve_pages(reserved_memory[i].addr, reserved_memory[i].size);
+    }
+
+    _populate_orders_lists();
+
+    need_logging = 1;
+
+    return 0;
 }
 
 void * memory_allocate_pages(uint64_t size) {
@@ -170,14 +263,14 @@ void * memory_allocate_pages(uint64_t size) {
 
         struct page * buddy_page = memory_page_metadata(buddy_addr); 
         buddy_page->order = order;
-        buddy_page->flags = PAGE_FREE;
+        buddy_page->flags = PAGE_FLAG_FREE;
 
         _log_page_add(buddy_addr, order);
     }
 
     struct page * page = memory_page_metadata(block_addr);
     page->order = order;
-    page->flags = PAGE_ALLOCATED;
+    page->flags = PAGE_FLAG_ALLOCATED;
 
     return (void *)block_addr;
 }
@@ -192,7 +285,7 @@ static struct linked_list_node * _get_buddy(uintptr_t block_addr, uint8_t order)
         return 0;
     }
 
-    if ((buddy_page->flags & PAGE_FREE) && buddy_page->order == order) {
+    if ((buddy_page->flags & PAGE_FLAG_FREE) && buddy_page->order == order) {
         _log_buddy_found(block_addr, buddy_addr, order);
 
         return (struct linked_list_node *)buddy_addr;
@@ -231,7 +324,7 @@ void memory_free_pages(void * block_addr) {
 
     struct page * new_page = memory_page_metadata(new_block_addr);
     new_page->order = order;
-    new_page->flags = PAGE_FREE;
+    new_page->flags = PAGE_FLAG_FREE;
 
     _log_page_add(new_block_addr, order);
 }

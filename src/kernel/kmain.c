@@ -172,7 +172,7 @@ static void setup_memory(void) {
         i64tox(memory_size, buf2);
         uart_puts_variadic("[KERNEL] insert memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
 
-        memory_insert(memory_base, memory_size);
+        memory_add(memory_base, memory_size);
     }
 
     {
@@ -211,14 +211,16 @@ static void setup_memory(void) {
         }
     }
 
-    memory_init();
+    if (memory_init()) {
+        uart_puts("[KERNEL:ERROR] error occurred during memory init");
+        return;
+    }
     dynamic_allocator_init();
 
     uart_puts("[KERNEL] Done setting up memory\n");
 
     /*
     TODO:
-    - allocate memory for frame array dynamically
     - test on orange pi
     - support multiple memory regions
     - clean up the kmain.c
