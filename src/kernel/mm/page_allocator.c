@@ -38,6 +38,52 @@ static inline uint32_t _get_page_index(uintptr_t page_addr) {
     return (page_addr - memory_base_addr) / PAGE_SIZE;
 }
 
+void _log_orders() {
+    uint32_t counts[21];
+    
+    // Calculate counts for each order
+    for (uint32_t order = 0; order <= 20; order++) {
+        uint32_t count = 0;
+        struct linked_list_node * current = orders_lists[order].head;
+        
+        while (current != 0) {
+            count++;
+            current = current->next;
+        }
+        counts[order] = count;
+    }
+    
+    // Print orders line
+    uart_puts_variadic("[Orders] orders ", 0);
+    for (uint32_t order = 0; order <= 20; order++) {
+        char order_buf[40];
+        i32toa(order, order_buf);
+        
+        // Pad single digits with a leading space for alignment
+        if (order < 10) {
+            uart_puts_variadic(" ", order_buf, "  ", 0);
+        } else {
+            uart_puts_variadic(order_buf, "  ", 0);
+        }
+    }
+    uart_puts_variadic("\n[Orders] values ", 0);
+    
+    // Print values line
+    for (uint32_t order = 0; order <= 20; order++) {
+        char count_buf[40];
+        i32toa(counts[order], count_buf);
+        
+        // Get string length to calculate padding
+        uint32_t len = kstrlen(count_buf);
+        if (len == 1) {
+            uart_puts_variadic(" ", count_buf, "  ", 0);
+        } else {
+            uart_puts_variadic(count_buf, "  ", 0);
+        }
+    }
+    uart_puts_variadic("\n", 0);
+}
+
 void _log_page_add(uintptr_t page_addr, uint32_t order) {
     if (!need_logging) return;
 
@@ -76,6 +122,8 @@ void _log_page_allocate(uintptr_t page_addr, uint32_t order) {
     i32toa(order, b2);
     i32toa(_get_page_index(page_addr), b3);
     uart_puts_variadic("[Page] Allocate 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+
+    _log_orders();
 }
 
 void _log_page_free(uintptr_t page_addr, uint32_t order) {
@@ -86,6 +134,8 @@ void _log_page_free(uintptr_t page_addr, uint32_t order) {
     i32toa(order, b2);
     i32toa(_get_page_index(page_addr), b3);
     uart_puts_variadic("[Page] Free 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+
+    _log_orders();
 }
 
 void _log_reserve(uintptr_t addr, uint64_t size) {
@@ -266,12 +316,11 @@ void * memory_allocate_pages(uint64_t size) {
         uintptr_t buddy_addr = block_addr + (PAGE_SIZE << order);
 
         linked_list_insert(&orders_lists[order], (struct linked_list_node *)buddy_addr);
+        _log_page_add(buddy_addr, order);
 
         struct page * buddy_page = memory_page_metadata(buddy_addr); 
         buddy_page->order = order;
         buddy_page->flags = PAGE_FLAG_FREE;
-
-        _log_page_add(buddy_addr, order);
     }
 
     struct page * page = memory_page_metadata(block_addr);
@@ -327,10 +376,9 @@ void memory_free_pages(void * block_addr) {
     }
 
     linked_list_insert(&orders_lists[order], (struct linked_list_node *)new_block_addr);
+    _log_page_add(new_block_addr, order);
 
     struct page * new_page = memory_page_metadata(new_block_addr);
     new_page->order = order;
     new_page->flags = PAGE_FLAG_FREE;
-
-    _log_page_add(new_block_addr, order);
 }

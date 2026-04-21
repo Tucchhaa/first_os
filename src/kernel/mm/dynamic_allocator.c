@@ -12,8 +12,8 @@ struct pool {
     struct linked_list list;
 };
 
-# define POOLS_SIZE 8
-uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024 };
+# define POOLS_SIZE 9
+uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024, 2048 };
 struct pool pools[POOLS_SIZE];
 
 void _log_allocate_chunk(uintptr_t addr, uint32_t chunk_size) {
