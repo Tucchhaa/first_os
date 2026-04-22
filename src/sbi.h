@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 struct sbiret {
     long error;
     long value;
@@ -20,3 +22,5 @@ struct sbiret sbi_probe_extension(int ext);
 struct sbiret sbi_get_spec_version(void);
 struct sbiret sbi_get_impl_id(void);
 struct sbiret sbi_get_impl_version(void);
+
+void sbi_set_timer(uint64_t target_time);

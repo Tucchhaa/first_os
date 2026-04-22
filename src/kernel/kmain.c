@@ -186,7 +186,20 @@ static void setup_initrd(void) {
 }
 
 static void setup_traps(void) {
-    trap_setup();
+    uintptr_t node_addr = fdt_node_addr_by_path(fdt_addr, "/cpus");
+    uintptr_t prop_addr = fdt_property_addr_by_name(fdt_addr, node_addr, "timebase-frequency");
+    
+    if (prop_addr == 0) {
+        uart_puts("/cpus[timebase-frequency] is not found\n");
+        return;
+    }
+
+    struct fdt_property * prop = fdt_property_at_addr(prop_addr);
+    uint32_t val = be32_to_cpu(*(uint32_t *)(&prop->data));
+    
+    trap_setup(val);
+
+    schedule_interrupt();
 }
 
 static void setup_memory(void) {
@@ -600,7 +613,9 @@ static void command_exec() {
         proc_addr[i] = ((char *)file_data)[i];
     }
 
-    uint64_t sstatus = (1 << 5); // bit 5 = SPIE, SPP bit = 0
+    uint64_t sstatus;
+    asm volatile("csrr %0, sstatus" : "=r"(sstatus));
+    sstatus |= (1 << 5);     // Set SPIE
 
     asm volatile ("csrw sepc, %0" :: "r" (proc_addr) : "memory");
     asm volatile ("csrw sstatus, %0" :: "r" (sstatus) : "memory");

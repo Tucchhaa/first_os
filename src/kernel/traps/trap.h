@@ -27,6 +27,8 @@ struct cpuframe {
     uint64_t sstatus;
 };
 
-void trap_setup();
+void trap_setup(uint32_t _timer_freq);
 
 void trap_handler();
+
+void schedule_interrupt();
