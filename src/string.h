@@ -17,4 +17,4 @@ void i8tox(int8_t x, char * const buf);
 
 uint32_t xtoi32(char * const buf);
 
-void i32toa(int32_t, char * const buf);
+void itoa(int64_t, char * const buf);

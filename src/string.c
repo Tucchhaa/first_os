@@ -95,7 +95,7 @@ uint32_t xtoi32(char * const buf) {
 }
 
 // buf size must be at least 12
-void i32toa(int32_t x, char * const buf) {
+void itoa(int64_t x, char * const buf) {
     if (x == 0) {
         buf[0] = '0';
         buf[1] = '\0';

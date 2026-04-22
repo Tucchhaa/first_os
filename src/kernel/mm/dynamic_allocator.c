@@ -19,14 +19,14 @@ struct pool pools[POOLS_SIZE];
 void _log_allocate_chunk(uintptr_t addr, uint32_t chunk_size) {
     char b1[40], b2[40];
     i64tox(addr, b1);
-    i32toa(chunk_size, b2);
+    itoa(chunk_size, b2);
     uart_puts_variadic("[Chunk] Allocate 0x", b1, " at chunk size ", b2, "\n", 0);
 }
 
 void _log_free_chunk(uintptr_t addr, uint32_t chunk_size) {
     char b1[40], b2[40];
     i64tox(addr, b1);
-    i32toa(chunk_size, b2);
+    itoa(chunk_size, b2);
     uart_puts_variadic("[Chunk] Free 0x", b1, " at chunk size ", b2, "\n", 0);
 }
 

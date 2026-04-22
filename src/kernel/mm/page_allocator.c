@@ -57,7 +57,7 @@ void _log_orders() {
     uart_puts_variadic("[Orders] orders ", 0);
     for (uint32_t order = 0; order <= 20; order++) {
         char order_buf[40];
-        i32toa(order, order_buf);
+        itoa(order, order_buf);
         
         // Pad single digits with a leading space for alignment
         if (order < 10) {
@@ -71,7 +71,7 @@ void _log_orders() {
     // Print values line
     for (uint32_t order = 0; order <= 20; order++) {
         char count_buf[40];
-        i32toa(counts[order], count_buf);
+        itoa(counts[order], count_buf);
         
         // Get string length to calculate padding
         uint32_t len = kstrlen(count_buf);
@@ -88,9 +88,9 @@ void _log_page_add(uintptr_t page_addr, uint32_t order) {
     if (!need_logging) return;
 
     char b1[40], b2[40], b3[40];
-    i32toa(_get_page_index(page_addr), b1);
+    itoa(_get_page_index(page_addr), b1);
     i64tox(page_addr, b2);
-    i32toa(order, b3);
+    itoa(order, b3);
     uart_puts_variadic("[+] Add page ", b1, " at address 0x", b2, " to order ", b3, "\n", 0);
 }
 
@@ -98,9 +98,9 @@ void _log_page_remove(uintptr_t page_addr, uint32_t order) {
     if (!need_logging) return;
 
     char b1[40], b2[40], b3[40];
-    i32toa(_get_page_index(page_addr), b1);
+    itoa(_get_page_index(page_addr), b1);
     i64tox(page_addr, b2);
-    i32toa(order, b3);
+    itoa(order, b3);
     uart_puts_variadic("[-] Remove page ", b1, " at address 0x", b2, " from order ", b3, "\n", 0);
 }
 
@@ -108,9 +108,9 @@ void _log_buddy_found(uintptr_t page_addr, uintptr_t buddy_addr, uint32_t order)
     if (!need_logging) return;
 
     char b1[40], b2[40], b3[40];
-    i32toa(_get_page_index(buddy_addr), b1);
-    i32toa(_get_page_index(page_addr), b2);
-    i32toa(order, b3);
+    itoa(_get_page_index(buddy_addr), b1);
+    itoa(_get_page_index(page_addr), b2);
+    itoa(order, b3);
     uart_puts_variadic("[*] Buddy found! buddy idx: ", b1, " for page ", b2, " with order ", b3, "\n", 0);
 }
 
@@ -119,8 +119,8 @@ void _log_page_allocate(uintptr_t page_addr, uint32_t order) {
 
     char b1[40], b2[40], b3[40];
     i64tox(page_addr, b1);
-    i32toa(order, b2);
-    i32toa(_get_page_index(page_addr), b3);
+    itoa(order, b2);
+    itoa(_get_page_index(page_addr), b3);
     uart_puts_variadic("[Page] Allocate 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
 
     _log_orders();
@@ -131,8 +131,8 @@ void _log_page_free(uintptr_t page_addr, uint32_t order) {
 
     char b1[40], b2[40], b3[40];
     i64tox(page_addr, b1);
-    i32toa(order, b2);
-    i32toa(_get_page_index(page_addr), b3);
+    itoa(order, b2);
+    itoa(_get_page_index(page_addr), b3);
     uart_puts_variadic("[Page] Free 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
 
     _log_orders();

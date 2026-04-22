@@ -6,6 +6,7 @@
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
 #include "initrd.h"
+#include "traps/trap.h"
 
 extern char __kernel_start;
 extern char __kernel_end;
@@ -20,6 +21,7 @@ uintptr_t initrd_end_addr;
 static void setup_uart(void);
 static void read_fdt(void);
 static void setup_initrd(void);
+static void setup_traps(void);
 static void setup_memory(void);
 
 static void command_info(void);
@@ -32,6 +34,7 @@ static void command_testmm2(void);
 static void command_testmm3(void);
 static void command_testmm4(void);
 static void command_testmm5(void);
+static void command_exec(void);
 
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     fdt_addr = _fdt_addr;
@@ -43,6 +46,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     setup_uart();
     read_fdt();
     setup_initrd();
+    setup_memory();
+    setup_traps();
     uart_puts("\n");
     
     const int command_max_size = 100;
@@ -94,6 +99,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         }
         else if (streql(command, "testmm")) {
             command_testmm();
+        }
+        else if (streql(command, "exec")) {
+            command_exec();
         }
         else {
             uart_puts("Unknown command\n");
@@ -163,7 +171,22 @@ static void setup_initrd(void) {
         uart_puts("[KERNEL] initrd magic is correct\n");
     } else {
         uart_puts("[KERNEL] initrd magic is not correct\n");
+
+        uintptr_t addr = initrd_start_addr;
+
+        for(int i=0; i < 10; i++) {
+            uint8_t a = *(uint8_t *)(addr + i);
+            char b[10];
+            i8tox(a, b);
+            uart_puts(b);
+            uart_puts(" ");
+        }
+        uart_puts("\n");
     }
+}
+
+static void setup_traps(void) {
+    trap_setup();
 }
 
 static void setup_memory(void) {
@@ -249,6 +272,7 @@ static void setup_memory(void) {
     - optimize page allocator
     - use single linked list
     - implement self relocating bootloader
+    - memset to 0 allocated pages
     */
 }
 
@@ -275,7 +299,6 @@ static void command_info(void) {
 }
 
 static void command_testfdt(void) {
-    // interrupt-controller node
     uintptr_t interrupt_controller_node = fdt_node_addr_by_path(
         fdt_addr, "/cpus/cpu@0/interrupt-controller"
     );
@@ -287,7 +310,7 @@ static void command_testfdt(void) {
         uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
     } else {
         char buf[40];
-        i32toa(be32_to_cpu(compatible_prop->len), buf);
+        itoa(be32_to_cpu(compatible_prop->len), buf);
         uart_puts_variadic("property data len: ", buf, "\n\n", 0);
 
         uart_puts("compatible: ");
@@ -345,7 +368,7 @@ static void command_ls(void) {
     }
 
     char buf[40];
-    i32toa(files_count, buf);
+    itoa(files_count, buf);
     uart_puts_variadic("Total ", buf, " files.\n", 0);
 
     // show all files
@@ -358,7 +381,7 @@ static void command_ls(void) {
         uint32_t file_data_size;
         initrd_get_filedata(file_addr, &file_data_size);
 
-        i32toa(file_data_size, buf);
+        itoa(file_data_size, buf);
         uart_puts(buf);
 
         int32_t space_count = 8 - kstrlen(buf);
@@ -558,4 +581,28 @@ static void command_testmm() {
     command_testmm2();
     command_testmm3();
     command_testmm4();
+}
+
+static void command_exec() {
+    uintptr_t file_addr = initrd_get_file_addr(initrd_start_addr, "./prog.bin");
+
+    if (file_addr == 0) {
+        uart_puts("Could not find user program\n");
+        return;
+    }
+
+    uint32_t data_size;
+    uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
+
+    char * proc_addr = allocate(4096);
+
+    for (uintptr_t i = 0; i < data_size; i += 1) {
+        proc_addr[i] = ((char *)file_data)[i];
+    }
+
+    uint64_t sstatus = (1 << 5); // bit 5 = SPIE, SPP bit = 0
+
+    asm volatile ("csrw sepc, %0" :: "r" (proc_addr) : "memory");
+    asm volatile ("csrw sstatus, %0" :: "r" (sstatus) : "memory");
+    asm volatile ("sret");
 }

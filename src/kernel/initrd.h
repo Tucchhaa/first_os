@@ -9,3 +9,5 @@ const char * initrd_get_filepath(uintptr_t file_addr, uint32_t * path_size);
 uintptr_t initrd_get_filedata(uintptr_t file_addr, uint32_t * data_size);
 
 uintptr_t initrd_get_next_file_addr(uintptr_t file_addr);
+
+uintptr_t initrd_get_file_addr(uintptr_t initrd_start_addr, const char * filepath);

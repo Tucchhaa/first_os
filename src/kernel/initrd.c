@@ -74,3 +74,24 @@ uintptr_t initrd_get_next_file_addr(uintptr_t file_addr) {
 
     return next_addr;
 }
+
+uintptr_t initrd_get_file_addr(uintptr_t initrd_start_addr, const char * filepath) {
+    if (initrd_check_magic(initrd_start_addr) == 0) {
+        return 0;
+    }
+
+    uintptr_t file_addr = initrd_start_addr;
+
+    while (file_addr != 0) {
+        uint32_t path_size;
+        const char * current_filepath = initrd_get_filepath(file_addr, &path_size);
+
+        if (streqln(filepath, current_filepath, path_size)) {
+            return file_addr;
+        }
+
+        file_addr = initrd_get_next_file_addr(file_addr);
+    }
+
+    return 0;
+}
