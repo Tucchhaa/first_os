@@ -15,13 +15,19 @@ static void receive_kernel_bin(int kernel_size) {
         uint8_t byte;
         uart_get_bytes((uint8_t *)&byte, sizeof(byte));
 
-        *(volatile uintptr_t *)(KERNEL_ADDR + loaded_bytes_count) = byte;
+        *(volatile uint8_t *)(KERNEL_ADDR + loaded_bytes_count) = byte;
         loaded_bytes_count += 1;
     }
 
     // make sure that all writes are finished before jumping to kernel
     asm volatile ("fence"   ::: "memory");
     asm volatile ("fence.i" ::: "memory");
+
+    // ack to host: kernel received
+    uart_put(0x42);
+    uart_put(0x4F);
+    uart_put(0x4F);
+    uart_put(0x54);
 
     ((void (*)(uint64_t, uintptr_t))KERNEL_ADDR)(hartid, fdt_addr);
 }
