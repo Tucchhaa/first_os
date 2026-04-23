@@ -39,110 +39,110 @@ static inline uint32_t _get_page_index(uintptr_t page_addr) {
 }
 
 void _log_orders() {
-    uint32_t counts[21];
+    // uint32_t counts[21];
     
-    // Calculate counts for each order
-    for (uint32_t order = 0; order <= 20; order++) {
-        uint32_t count = 0;
-        struct linked_list_node * current = orders_lists[order].head;
+    // // Calculate counts for each order
+    // for (uint32_t order = 0; order <= 20; order++) {
+    //     uint32_t count = 0;
+    //     struct linked_list_node * current = orders_lists[order].head;
         
-        while (current != 0) {
-            count++;
-            current = current->next;
-        }
-        counts[order] = count;
-    }
+    //     while (current != 0) {
+    //         count++;
+    //         current = current->next;
+    //     }
+    //     counts[order] = count;
+    // }
     
-    // Print orders line
-    uart_puts_variadic("[Orders] orders ", 0);
-    for (uint32_t order = 0; order <= 20; order++) {
-        char order_buf[40];
-        itoa(order, order_buf);
+    // // Print orders line
+    // async_uart_puts_variadic("[Orders] orders ", 0);
+    // for (uint32_t order = 0; order <= 20; order++) {
+    //     char order_buf[40];
+    //     itoa(order, order_buf);
         
-        // Pad single digits with a leading space for alignment
-        if (order < 10) {
-            uart_puts_variadic(" ", order_buf, "  ", 0);
-        } else {
-            uart_puts_variadic(order_buf, "  ", 0);
-        }
-    }
-    uart_puts_variadic("\n[Orders] values ", 0);
+    //     // Pad single digits with a leading space for alignment
+    //     if (order < 10) {
+    //         async_uart_puts_variadic(" ", order_buf, "  ", 0);
+    //     } else {
+    //         async_uart_puts_variadic(order_buf, "  ", 0);
+    //     }
+    // }
+    // async_uart_puts_variadic("\n[Orders] values ", 0);
     
-    // Print values line
-    for (uint32_t order = 0; order <= 20; order++) {
-        char count_buf[40];
-        itoa(counts[order], count_buf);
+    // // Print values line
+    // for (uint32_t order = 0; order <= 20; order++) {
+    //     char count_buf[40];
+    //     itoa(counts[order], count_buf);
         
-        // Get string length to calculate padding
-        uint32_t len = kstrlen(count_buf);
-        if (len == 1) {
-            uart_puts_variadic(" ", count_buf, "  ", 0);
-        } else {
-            uart_puts_variadic(count_buf, "  ", 0);
-        }
-    }
-    uart_puts_variadic("\n", 0);
+    //     // Get string length to calculate padding
+    //     uint32_t len = kstrlen(count_buf);
+    //     if (len == 1) {
+    //         async_uart_puts_variadic(" ", count_buf, "  ", 0);
+    //     } else {
+    //         async_uart_puts_variadic(count_buf, "  ", 0);
+    //     }
+    // }
+    // async_uart_puts_variadic("\n", 0);
 }
 
 void _log_page_add(uintptr_t page_addr, uint32_t order) {
-    if (!need_logging) return;
+    // if (!need_logging) return;
 
-    char b1[40], b2[40], b3[40];
-    itoa(_get_page_index(page_addr), b1);
-    i64tox(page_addr, b2);
-    itoa(order, b3);
-    uart_puts_variadic("[+] Add page ", b1, " at address 0x", b2, " to order ", b3, "\n", 0);
+    // char b1[40], b2[40], b3[40];
+    // itoa(_get_page_index(page_addr), b1);
+    // i64tox(page_addr, b2);
+    // itoa(order, b3);
+    // async_uart_puts_variadic("[+] Add page ", b1, " at address 0x", b2, " to order ", b3, "\n", 0);
 }
 
 void _log_page_remove(uintptr_t page_addr, uint32_t order) {
-    if (!need_logging) return;
+    // if (!need_logging) return;
 
-    char b1[40], b2[40], b3[40];
-    itoa(_get_page_index(page_addr), b1);
-    i64tox(page_addr, b2);
-    itoa(order, b3);
-    uart_puts_variadic("[-] Remove page ", b1, " at address 0x", b2, " from order ", b3, "\n", 0);
+    // char b1[40], b2[40], b3[40];
+    // itoa(_get_page_index(page_addr), b1);
+    // i64tox(page_addr, b2);
+    // itoa(order, b3);
+    // async_uart_puts_variadic("[-] Remove page ", b1, " at address 0x", b2, " from order ", b3, "\n", 0);
 }
 
 void _log_buddy_found(uintptr_t page_addr, uintptr_t buddy_addr, uint32_t order) {
-    if (!need_logging) return;
+    // if (!need_logging) return;
 
-    char b1[40], b2[40], b3[40];
-    itoa(_get_page_index(buddy_addr), b1);
-    itoa(_get_page_index(page_addr), b2);
-    itoa(order, b3);
-    uart_puts_variadic("[*] Buddy found! buddy idx: ", b1, " for page ", b2, " with order ", b3, "\n", 0);
+    // char b1[40], b2[40], b3[40];
+    // itoa(_get_page_index(buddy_addr), b1);
+    // itoa(_get_page_index(page_addr), b2);
+    // itoa(order, b3);
+    // async_uart_puts_variadic("[*] Buddy found! buddy idx: ", b1, " for page ", b2, " with order ", b3, "\n", 0);
 }
 
 void _log_page_allocate(uintptr_t page_addr, uint32_t order) {
-    if (!need_logging) return;
+    // if (!need_logging) return;
 
-    char b1[40], b2[40], b3[40];
-    i64tox(page_addr, b1);
-    itoa(order, b2);
-    itoa(_get_page_index(page_addr), b3);
-    uart_puts_variadic("[Page] Allocate 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+    // char b1[40], b2[40], b3[40];
+    // i64tox(page_addr, b1);
+    // itoa(order, b2);
+    // itoa(_get_page_index(page_addr), b3);
+    // async_uart_puts_variadic("[Page] Allocate 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
 
-    _log_orders();
+    // _log_orders();
 }
 
 void _log_page_free(uintptr_t page_addr, uint32_t order) {
-    if (!need_logging) return;
+    // if (!need_logging) return;
 
-    char b1[40], b2[40], b3[40];
-    i64tox(page_addr, b1);
-    itoa(order, b2);
-    itoa(_get_page_index(page_addr), b3);
-    uart_puts_variadic("[Page] Free 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
+    // char b1[40], b2[40], b3[40];
+    // i64tox(page_addr, b1);
+    // itoa(order, b2);
+    // itoa(_get_page_index(page_addr), b3);
+    // async_uart_puts_variadic("[Page] Free 0x", b1, " at order ", b2, ", page ", b3, "\n", 0);
 
-    _log_orders();
+    // _log_orders();
 }
 
 void _log_reserve(uintptr_t addr, uint64_t size) {
-    char b1[40], b2[40];
-    i64tox(addr, b1);
-    i64tox(addr + size, b2);
-    uart_puts_variadic("[Reserve] Reserve address [0x", b1, ", 0x", b2, ")\n", 0);
+    // char b1[40], b2[40];
+    // i64tox(addr, b1);
+    // i64tox(addr + size, b2);
+    // async_uart_puts_variadic("[Reserve] Reserve address [0x", b1, ", 0x", b2, ")\n", 0);
 }
 
 void memory_add(uintptr_t addr, uint64_t size) {

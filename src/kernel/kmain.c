@@ -48,24 +48,25 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     setup_initrd();
     setup_memory();
     setup_traps();
-    uart_puts("\n");
+    async_uart_setup();
+    async_uart_puts("\n");
     
     const int command_max_size = 100;
     char command[command_max_size];
 
     while(1) {
-        uart_puts("sh> ");
-        uart_getline(command, command_max_size);
+        async_uart_puts("sh> ");
+        async_uart_getline(command, command_max_size);
 
         if (streql(command, "help")) {
-            uart_puts("Available commands:\n");
-            uart_puts("  help - show all commands\n");
-            uart_puts("  info - print system info\n");
-            uart_puts("  ls - print file system.\n");
-            uart_puts("  cat <filepath> - print contents of a file.\n");
-            uart_puts("  testfdt - test fdt parser.\n");
-            uart_puts("  setupmm - setup memory allocator.\n");
-            uart_puts("  testmm - test memory allocator.\n");
+            async_uart_puts("Available commands:\n");
+            async_uart_puts("  help - show all commands\n");
+            async_uart_puts("  info - print system info\n");
+            async_uart_puts("  ls - print file system.\n");
+            async_uart_puts("  cat <filepath> - print contents of a file.\n");
+            async_uart_puts("  testfdt - test fdt parser.\n");
+            async_uart_puts("  setupmm - setup memory allocator.\n");
+            async_uart_puts("  testmm - test memory allocator.\n");
         } 
         else if (streql(command, "info")) {
             command_info();
@@ -104,7 +105,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             command_exec();
         }
         else {
-            uart_puts("Unknown command\n");
+            async_uart_puts("Unknown command\n");
         }
     }
 }
@@ -292,23 +293,23 @@ static void setup_memory(void) {
 static void command_info(void) {
     char buf[20];
 
-    uart_puts("System information:\n");
+    async_uart_puts("System information:\n");
 
     if (sbi_get_spec_version().error) {
-        uart_puts("  error occured\n");
+        async_uart_puts("  error occured\n");
         return;
     }
 
     i64tox(sbi_get_spec_version().value, buf);
-    uart_puts_variadic("  OpenSBI specification version: 0x", buf, "\n", 0);
+    async_uart_puts_variadic("  OpenSBI specification version: 0x", buf, "\n", 0);
 
     i64tox(sbi_get_impl_id().value, buf);
-    uart_puts_variadic("  implementation ID: 0x", buf, "\n", 0);
+    async_uart_puts_variadic("  implementation ID: 0x", buf, "\n", 0);
 
     i64tox(sbi_get_impl_version().value, buf);
-    uart_puts_variadic("  implementation version: 0x", buf, "\n", 0);
+    async_uart_puts_variadic("  implementation version: 0x", buf, "\n", 0);
     
-    uart_puts("\n");
+    async_uart_puts("\n");
 }
 
 static void command_testfdt(void) {
@@ -320,21 +321,21 @@ static void command_testfdt(void) {
     );
 
     if (compatible_prop == 0) {
-        uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
+        async_uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
     } else {
         char buf[40];
         itoa(be32_to_cpu(compatible_prop->len), buf);
-        uart_puts_variadic("property data len: ", buf, "\n\n", 0);
+        async_uart_puts_variadic("property data len: ", buf, "\n\n", 0);
 
-        uart_puts("compatible: ");
+        async_uart_puts("compatible: ");
 
         uint32_t i = 0;
 
         while (i < be32_to_cpu(compatible_prop->len)) {
-            uart_put(((const char *)&compatible_prop->data)[i]);
+            async_uart_put(((const char *)&compatible_prop->data)[i]);
             i += 1;
         }
-        uart_puts("\n");
+        async_uart_puts("\n");
     }
 
     // memory node
@@ -352,22 +353,22 @@ static void command_testfdt(void) {
     i64tox(memory_base, buf1);
     i64tox(memory_size, buf2);
 
-    uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
+    async_uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
 
     // initrd
     if (initrd_start_addr == 0) {
-        uart_puts("/chosen[linux,initrd-start] - not found\n");
+        async_uart_puts("/chosen[linux,initrd-start] - not found\n");
     } else {
         char buf1[40], buf2[40];
         i64tox(initrd_start_addr, buf1);
         i64tox(initrd_end_addr, buf2);
-        uart_puts_variadic("initrd: start=0x", buf1, " end=0x", buf2, "\n", 0);
+        async_uart_puts_variadic("initrd: start=0x", buf1, " end=0x", buf2, "\n", 0);
     }
 }
 
 static void command_ls(void) {
     if (initrd_check_magic(initrd_start_addr) == 0) {
-        uart_puts("initrd was not found\n");
+        async_uart_puts("initrd was not found\n");
         return;
     }
 
@@ -382,7 +383,7 @@ static void command_ls(void) {
 
     char buf[40];
     itoa(files_count, buf);
-    uart_puts_variadic("Total ", buf, " files.\n", 0);
+    async_uart_puts_variadic("Total ", buf, " files.\n", 0);
 
     // show all files
     file_addr = initrd_start_addr;
@@ -395,24 +396,24 @@ static void command_ls(void) {
         initrd_get_filedata(file_addr, &file_data_size);
 
         itoa(file_data_size, buf);
-        uart_puts(buf);
+        async_uart_puts(buf);
 
         int32_t space_count = 8 - kstrlen(buf);
 
         while (space_count) {
-            uart_puts(" ");
+            async_uart_puts(" ");
             space_count -= 1;
         }
 
         for(int i=0; i < path_size; i++) {
-            uart_put(filepath[i]);
+            async_uart_put(filepath[i]);
         }
-        uart_puts("\n");
+        async_uart_puts("\n");
 
         file_addr = initrd_get_next_file_addr(file_addr);
     }
 
-    uart_puts("\n");
+    async_uart_puts("\n");
 }
 
 static void command_cat(const char * command) {
@@ -432,22 +433,22 @@ static void command_cat(const char * command) {
             for (int i=0; i < data_size; i++) {
                 char c = ((char *)data)[i];
                 
-                if (c == '\n') { uart_put('\r'); }
-                uart_put(c);
+                if (c == '\n') { async_uart_put('\r'); }
+                async_uart_put(c);
             }
 
-            uart_puts("\n");
+            async_uart_puts("\n");
             return;
         }
 
         file_addr = initrd_get_next_file_addr(file_addr);
     }
 
-    uart_puts("File not found\n\n");
+    async_uart_puts("File not found\n\n");
 }
 
 static void command_testmm1() {
-    uart_puts("Testing memory allocation...\n");
+    async_uart_puts("Testing memory allocation...\n");
     char *ptr1 = (char *)allocate(4000);
     char *ptr2 = (char *)allocate(8000);
     char *ptr3 = (char *)allocate(4000);
@@ -461,7 +462,7 @@ static void command_testmm1() {
 
 static void command_testmm2() {
     /* Test kmalloc */
-    uart_puts("Testing dynamic allocator...\n");
+    async_uart_puts("Testing dynamic allocator...\n");
     char *kmem_ptr1 = (char *)allocate(16);
     char *kmem_ptr2 = (char *)allocate(32);
     char *kmem_ptr3 = (char *)allocate(64);
@@ -494,10 +495,10 @@ static void command_testmm4() {
     // Test exceeding the maximum size
     char *kmem_ptr7 = (char *)allocate(1 << 31);
     if (kmem_ptr7 == 0) {
-        uart_puts("Allocation failed as expected for size > MAX_ALLOC_SIZE\n");
+        async_uart_puts("Allocation failed as expected for size > MAX_ALLOC_SIZE\n");
     }
     else {
-        uart_puts("Unexpected allocation success for size > MAX_ALLOC_SIZE\n");
+        async_uart_puts("Unexpected allocation success for size > MAX_ALLOC_SIZE\n");
         free(kmem_ptr7);
     }
 }
@@ -505,14 +506,14 @@ static void command_testmm4() {
 static void command_testmm5() {
     /***************** Case 1 *****************/
 
-    uart_puts("\n===== Part 1 =====\n");
+    async_uart_puts("\n===== Part 1 =====\n");
 
     void *p1 = allocate(4097);
     free(p1);
 
-    uart_puts("\n=== Part 1 End ===\n");
+    async_uart_puts("\n=== Part 1 End ===\n");
 
-    uart_puts("\n===== Part 2 =====\n");
+    async_uart_puts("\n===== Part 2 =====\n");
 
     // Allocate all blocks at order 0, 1, 2 and 3
     int NUM_BLOCKS_AT_ORDER_0 = 0;  // Need modified
@@ -537,7 +538,7 @@ static void command_testmm5() {
         ps3[i] = allocate(32768);
     }
 
-    uart_puts("\n-----------\n");
+    async_uart_puts("\n-----------\n");
 
     long MAX_BLOCK_SIZE = PAGE_SIZE * (1 << 22);
 
@@ -570,7 +571,7 @@ static void command_testmm5() {
     free(p2);                        // 7197
     free(p3);                        // 2699
 
-    uart_puts("\n-----------\n");
+    async_uart_puts("\n-----------\n");
 
     // Free all blocks remaining
     for (int i = 0; i < NUM_BLOCKS_AT_ORDER_0; ++i) {
@@ -586,7 +587,7 @@ static void command_testmm5() {
         free(ps3[i]);
     }
 
-    uart_puts("\n=== Part 2 End ===\n");
+    async_uart_puts("\n=== Part 2 End ===\n");
 }
 
 static void command_testmm() {
@@ -600,7 +601,7 @@ static void command_exec() {
     uintptr_t file_addr = initrd_get_file_addr(initrd_start_addr, "./prog.bin");
 
     if (file_addr == 0) {
-        uart_puts("Could not find user program\n");
+        async_uart_puts("Could not find user program\n");
         return;
     }
 

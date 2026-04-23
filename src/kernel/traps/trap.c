@@ -29,6 +29,7 @@ STIE - timer interrupts enabled
 #include "../../uart.h"
 #include "../../string.h"
 #include "../mm/dynamic_allocator.h"
+#include "../plic/plic.h"
 
 static struct cpuframe * cpuframe;
 
@@ -83,8 +84,23 @@ void trap_handler() {
         char c[40];
         itoa(time, c);
 
-        uart_puts_variadic("boot time: ", c, "\n", 0);
+        async_uart_puts_variadic("boot time: ", c, "\n", 0);
         schedule_interrupt();
+        return;
+    }
+
+    uint8_t is_external = (scause == ((1ULL << 63) | 9));
+
+    if (is_external) {
+        uint32_t irq = plic_claim();
+
+        if (irq == UART_IRQ) {
+            uart_irq_handler();
+        }
+
+        if (irq != 0) {
+            plic_complete(irq);
+        }
         return;
     }
 
@@ -99,10 +115,10 @@ void trap_handler() {
     i32tox(cpuframe->sepc, sepc_buf);
     itoa(stval, stval_buf);
 
-    uart_puts("=== S-Mode trap ===\n");
-    uart_puts_variadic("scause: ", scause_buf, "\n", 0);
-    uart_puts_variadic("sepc: ", sepc_buf, "\n", 0);
-    uart_puts_variadic("stval: ", stval_buf, "\n", 0);
+    async_uart_puts("=== S-Mode trap ===\n");
+    async_uart_puts_variadic("scause: ", scause_buf, "\n", 0);
+    async_uart_puts_variadic("sepc: ", sepc_buf, "\n", 0);
+    async_uart_puts_variadic("stval: ", stval_buf, "\n", 0);
 
     // skip the ecall instruction
     cpuframe->sepc += 4;

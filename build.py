@@ -190,6 +190,8 @@ class Kernel(Project):
             "src/kernel/mm/dynamic_allocator.c",
             "src/kernel/traps/trap_entry.S",
             "src/kernel/traps/trap.c",
+            "src/kernel/plic/plic.c",
+            "src/uart_async.c",
         ]
 
 main()

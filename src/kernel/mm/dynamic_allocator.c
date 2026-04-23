@@ -17,17 +17,17 @@ uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024, 2048 }
 struct pool pools[POOLS_SIZE];
 
 void _log_allocate_chunk(uintptr_t addr, uint32_t chunk_size) {
-    char b1[40], b2[40];
-    i64tox(addr, b1);
-    itoa(chunk_size, b2);
-    uart_puts_variadic("[Chunk] Allocate 0x", b1, " at chunk size ", b2, "\n", 0);
+    // char b1[40], b2[40];
+    // i64tox(addr, b1);
+    // itoa(chunk_size, b2);
+    // async_uart_puts_variadic("[Chunk] Allocate 0x", b1, " at chunk size ", b2, "\n", 0);
 }
 
 void _log_free_chunk(uintptr_t addr, uint32_t chunk_size) {
-    char b1[40], b2[40];
-    i64tox(addr, b1);
-    itoa(chunk_size, b2);
-    uart_puts_variadic("[Chunk] Free 0x", b1, " at chunk size ", b2, "\n", 0);
+    // char b1[40], b2[40];
+    // i64tox(addr, b1);
+    // itoa(chunk_size, b2);
+    // async_uart_puts_variadic("[Chunk] Free 0x", b1, " at chunk size ", b2, "\n", 0);
 }
 
 void dynamic_allocator_init(void) {
