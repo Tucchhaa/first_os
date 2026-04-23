@@ -7,6 +7,7 @@
 #include "mm/dynamic_allocator.h"
 #include "initrd.h"
 #include "traps/trap.h"
+#include "plic/plic.h"
 
 extern char __kernel_start;
 extern char __kernel_end;
@@ -23,6 +24,9 @@ static void read_fdt(void);
 static void setup_initrd(void);
 static void setup_traps(void);
 static void setup_memory(void);
+static void setup_plic(void);
+
+static uint32_t uart_irq_from_fdt;
 
 static void command_info(void);
 static void command_testfdt(void);
@@ -48,7 +52,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     setup_initrd();
     setup_memory();
     setup_traps();
-    async_uart_setup();
+    setup_plic();
+    async_uart_setup(uart_irq_from_fdt);
     async_uart_puts("\n");
     
     const int command_max_size = 100;
@@ -139,7 +144,45 @@ static void setup_uart(void) {
 
     uart_setup(uart_base);
 
+    struct fdt_property * irq_prop = fdt_property_at_addr(
+        fdt_property_addr_by_name(fdt_addr, soc_serial_node, "interrupts")
+    );
+
+    if (irq_prop != 0) {
+        uart_irq_from_fdt = be32_to_cpu(*(uint32_t *)(&irq_prop->data));
+    } else {
+        uart_puts("[KERNEL:ERROR] serial node has no 'interrupts' property\n");
+    }
+
     uart_puts("[KERNEL] UART configuration done\n\n");
+}
+
+static void setup_plic(void) {
+    uintptr_t soc_node = fdt_node_addr_by_path(fdt_addr, "/soc");
+    uintptr_t plic_node = fdt_find_compatible_child(fdt_addr, soc_node, "riscv,plic0");
+
+    if (plic_node == 0) {
+        uart_puts("[KERNEL:ERROR] no node compatible with 'riscv,plic0' under /soc\n");
+        return;
+    }
+
+    struct fdt_node_cells soc_cells = fdt_get_node_cells(fdt_addr, soc_node);
+    if (soc_cells.error) {
+        uart_puts("[KERNEL:ERROR] /soc has no #address-cells/#size-cells\n");
+        return;
+    }
+
+    uint64_t plic_base = 0, plic_size = 0;
+    fdt_read_reg_property(
+        fdt_addr, plic_node, soc_cells.address, soc_cells.size,
+        &plic_base, &plic_size
+    );
+
+    char buf[40];
+    i64tox(plic_base, buf);
+    uart_puts_variadic("[KERNEL] PLIC base: 0x", buf, "\n", 0);
+
+    plic_init((uintptr_t)plic_base);
 }
 
 static void setup_initrd(void) {

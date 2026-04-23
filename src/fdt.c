@@ -188,6 +188,43 @@ uintptr_t fdt_node_addr_by_path(uintptr_t fdt, const char * path) {
     }
 }
 
+uintptr_t fdt_find_compatible_child(
+    uintptr_t fdt,
+    uintptr_t parent_node_addr,
+    const char * compat
+) {
+    if (parent_node_addr == 0) {
+        return 0;
+    }
+
+    uintptr_t child = fdt_child_node(parent_node_addr);
+
+    while (child != 0) {
+        uintptr_t compat_prop_addr = fdt_property_addr_by_name(fdt, child, "compatible");
+        struct fdt_property * compat_prop = fdt_property_at_addr(compat_prop_addr);
+
+        if (compat_prop != 0) {
+            uint32_t len = be32_to_cpu(compat_prop->len);
+            const char * s = (const char *)&compat_prop->data;
+            uint32_t i = 0;
+
+            while (i < len) {
+                if (streql(&s[i], compat)) {
+                    return child;
+                }
+                while (i < len && s[i] != '\0') {
+                    i += 1;
+                }
+                i += 1;
+            }
+        }
+
+        child = fdt_sibling_node(child);
+    }
+
+    return 0;
+}
+
 uintptr_t fdt_property_addr_by_name(
     uintptr_t fdt, 
     uintptr_t node_addr,

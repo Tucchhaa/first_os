@@ -1,8 +1,9 @@
 #include <stdarg.h>
 
 #include "uart.h"
-#include "platform.h"
 #include "kernel/plic/plic.h"
+
+uint32_t uart_irq;
 
 #define UART_IER_RX_AVAILABLE (1u << 0)
 #define UART_IER_THR_EMPTY    (1u << 1)
@@ -39,7 +40,9 @@ static inline void restore_sie(uint64_t prev) {
     }
 }
 
-void async_uart_setup(void) {
+void async_uart_setup(uint32_t irq) {
+    uart_irq = irq;
+
     rx_head = rx_tail = 0;
     tx_head = tx_tail = 0;
 
@@ -47,8 +50,7 @@ void async_uart_setup(void) {
     // demand so an empty TX ring doesn't storm us with interrupts.
     *_uart_ier = UART_IER_RX_AVAILABLE;
 
-    plic_init();
-    plic_enable_irq(UART_IRQ, 1);
+    plic_enable_irq(uart_irq, 1);
 
     // Enable S-mode external interrupts (SEIE)
     asm volatile("csrs sie, %0" :: "r"(1u << 9) : "memory");

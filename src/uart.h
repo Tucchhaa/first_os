@@ -12,7 +12,9 @@ void uart_puts(const char * str);
 void uart_puts_variadic(const char * first, ...);
 void uart_getline(char * buf, int n);
 
-void async_uart_setup(void);
+extern uint32_t uart_irq;
+
+void async_uart_setup(uint32_t irq);
 uint8_t async_uart_get(void);
 void async_uart_get_bytes(uint8_t * buf, int n);
 void async_uart_put(uint8_t b);

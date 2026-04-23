@@ -94,7 +94,7 @@ void trap_handler() {
     if (is_external) {
         uint32_t irq = plic_claim();
 
-        if (irq == UART_IRQ) {
+        if (irq == uart_irq) {
             uart_irq_handler();
         }
 

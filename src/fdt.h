@@ -41,6 +41,14 @@ uintptr_t fdt_sibling_node(uintptr_t node_addr);
 
 uintptr_t fdt_child_node(uintptr_t node_addr);
 
+/// returns address of the first child of parent_node_addr whose
+/// "compatible" property contains a string equal to compat, or 0.
+uintptr_t fdt_find_compatible_child(
+    uintptr_t fdt,
+    uintptr_t parent_node_addr,
+    const char * compat
+);
+
 struct fdt_property * fdt_property_at_addr(uintptr_t property_addr);
 
 /// returns a property with the property_name of the node

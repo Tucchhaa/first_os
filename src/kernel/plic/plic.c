@@ -1,24 +1,25 @@
 #include "plic.h"
 
-#include "../../platform.h"
-
 /*
 PLIC register layout (sifive,plic-1.0.0):
-  priority[irq]              : PLIC_BASE + 0x0000 + irq * 4
-  pending bits               : PLIC_BASE + 0x1000 + (irq / 32) * 4
-  enable bits[context]       : PLIC_BASE + 0x2000 + context * 0x80 + (irq / 32) * 4
-  threshold[context]         : PLIC_BASE + 0x200000 + context * 0x1000
-  claim/complete[context]    : PLIC_BASE + 0x200004 + context * 0x1000
+  priority[irq]              : _plic_base + 0x0000 + irq * 4
+  pending bits               : _plic_base + 0x1000 + (irq / 32) * 4
+  enable bits[context]       : _plic_base + 0x2000 + context * 0x80 + (irq / 32) * 4
+  threshold[context]         : _plic_base + 0x200000 + context * 0x1000
+  claim/complete[context]    : _plic_base + 0x200004 + context * 0x1000
 */
 
 #define PLIC_HART_CONTEXT 1
 
-#define PLIC_PRIORITY(irq)       ((volatile uint32_t *)(PLIC_BASE + 0x0000 + (irq) * 4))
-#define PLIC_ENABLE(ctx, irq)    ((volatile uint32_t *)(PLIC_BASE + 0x2000 + (ctx) * 0x80 + ((irq) / 32) * 4))
-#define PLIC_THRESHOLD(ctx)      ((volatile uint32_t *)(PLIC_BASE + 0x200000 + (ctx) * 0x1000))
-#define PLIC_CLAIM(ctx)          ((volatile uint32_t *)(PLIC_BASE + 0x200004 + (ctx) * 0x1000))
+static uintptr_t _plic_base;
 
-void plic_init(void) {
+#define PLIC_PRIORITY(irq)       ((volatile uint32_t *)(_plic_base + 0x0000 + (irq) * 4))
+#define PLIC_ENABLE(ctx, irq)    ((volatile uint32_t *)(_plic_base + 0x2000 + (ctx) * 0x80 + ((irq) / 32) * 4))
+#define PLIC_THRESHOLD(ctx)      ((volatile uint32_t *)(_plic_base + 0x200000 + (ctx) * 0x1000))
+#define PLIC_CLAIM(ctx)          ((volatile uint32_t *)(_plic_base + 0x200004 + (ctx) * 0x1000))
+
+void plic_init(uintptr_t base) {
+    _plic_base = base;
     *PLIC_THRESHOLD(PLIC_HART_CONTEXT) = 0;
 }
 
