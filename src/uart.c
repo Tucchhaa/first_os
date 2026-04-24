@@ -2,13 +2,19 @@
 
 #include "uart.h"
 #include "platform.h"
+#include "fdt/fdt.h"
 
 volatile uint8_t * _uart_base = 0;
 volatile uint8_t * _uart_status = 0;
 
-void uart_setup(uintptr_t base_addr) {
-    _uart_base = (uint8_t *)base_addr;
-    _uart_status = (uint8_t *)(base_addr + UART_STATUS_OFFSET);
+void uart_setup() {
+    uintptr_t uart_base_addr;
+    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
+    
+    fdt_read_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
+    
+    _uart_base = (uint8_t *)uart_base_addr;
+    _uart_status = (uint8_t *)(uart_base_addr + UART_STATUS_OFFSET);
 }
 
 // Transmit Holding Register Empty

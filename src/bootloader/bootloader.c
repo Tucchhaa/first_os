@@ -43,17 +43,6 @@ static void cli(void) {
     }
 }
 
-static void setup_uart() {
-    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
-    uint64_t uart_base;
-    fdt_read_reg_property(soc_serial_node, &uart_base, (void*)0);
-    uart_setup(uart_base);
-}
-
-static void setup_fallback_uart() {
-    uart_setup(UART_BASE);
-}
-
 void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
     hartid = _hartid;
 
@@ -61,6 +50,6 @@ void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
         return;
     }
 
-    setup_uart();
+    uart_setup();
     cli();
 }

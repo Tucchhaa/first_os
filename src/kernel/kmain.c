@@ -10,7 +10,6 @@
 extern char __kernel_start;
 extern char __kernel_end;
 
-static void setup_uart(void);
 static void setup_memory(void);
 
 static void command_info(void);
@@ -29,7 +28,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         return;
     }
 
-    setup_uart();
+    uart_setup();
+    uart_puts("[KERNEL] UART was set uo\n\n");
 
     uart_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
@@ -98,16 +98,6 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("Unknown command\n");
         }
     }
-}
-
-static void setup_uart(void) {
-    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
-
-    uint64_t uart_base;
-    fdt_read_reg_property(soc_serial_node, &uart_base, (void*)0);
-    uart_setup(uart_base);
-
-    uart_puts("[KERNEL] UART configuration done\n\n");
 }
 
 static void setup_memory(void) {
