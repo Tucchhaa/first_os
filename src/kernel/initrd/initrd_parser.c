@@ -1,6 +1,6 @@
-#include "initrd.h"
+#include "initrd_parser.h"
 
-#include "../string.h"
+#include "../../string.h"
 
 struct cpio_newc_header {
     char c_magic[6];

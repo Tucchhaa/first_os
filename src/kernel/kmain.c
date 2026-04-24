@@ -3,18 +3,14 @@
 #include "../string.h"
 #include "../fdt/fdt.h"
 #include "../utils.h"
+#include "initrd/initrd.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
-#include "initrd.h"
 
 extern char __kernel_start;
 extern char __kernel_end;
 
-uintptr_t initrd_start_addr;
-uintptr_t initrd_end_addr;
-
 static void setup_uart(void);
-static void setup_initrd(void);
 static void setup_memory(void);
 
 static void command_info(void);
@@ -34,7 +30,18 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 
     setup_uart();
-    setup_initrd();
+
+    uart_puts("[KERNEL:INITRD] Setting up...\n");
+    if (initrd_setup()) {
+        char buf[40];
+        i64tox(initrd_start_addr, buf);
+        uart_puts_variadic("[KERNEL:INITRD] initrd-start addr: 0x", buf, "\n", 0);
+
+        i64tox(initrd_end_addr, buf);
+        uart_puts_variadic("[KERNEL:INITRD] initrd-end addr: 0x", buf, "\n", 0);
+    } else {
+        uart_puts("[KERNEL:INITRD] Could not setup initrd. Probably initramfs is not passed\n");
+    }
     uart_puts("\n");
     
     const int command_max_size = 100;
@@ -101,35 +108,6 @@ static void setup_uart(void) {
     uart_setup(uart_base);
 
     uart_puts("[KERNEL] UART configuration done\n\n");
-}
-
-static void setup_initrd(void) {
-    uart_puts("[KERNEL] Setting up initrd\n");
-
-    uintptr_t chosen_node = fdt_node_addr_by_path("/chosen");
-    struct fdt_property * initrd_start_prop = fdt_property_by_name(chosen_node, "linux,initrd-start");
-    struct fdt_property * initrd_end_prop = fdt_property_by_name(chosen_node, "linux,initrd-end");
-
-    if (initrd_start_prop == 0 || initrd_end_prop == 0) {
-        uart_puts("[KERNEL] initrd-start or initrd_end prop is not found\n");
-        return;
-    }
-
-    initrd_start_addr = be64_to_cpu(*(uint64_t *)(&initrd_start_prop->data));
-    initrd_end_addr = be64_to_cpu(*(uint64_t *)(&initrd_end_prop->data));
-
-    char buf[40];
-    i64tox(initrd_start_addr, buf);
-    uart_puts_variadic("[KERNEL] initrd-start addr: 0x", buf, "\n", 0);
-
-    i64tox(initrd_end_addr, buf);
-    uart_puts_variadic("[KERNEL] initrd-end addr: 0x", buf, "\n", 0);
-
-    if (initrd_check_magic(initrd_start_addr)) {
-        uart_puts("[KERNEL] initrd magic is correct\n");
-    } else {
-        uart_puts("[KERNEL] initrd magic is not correct\n");
-    }
 }
 
 static void setup_memory(void) {

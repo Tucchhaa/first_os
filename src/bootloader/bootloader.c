@@ -57,8 +57,6 @@ static void setup_fallback_uart() {
 void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
     hartid = _hartid;
 
-    // setup_fallback_uart();
-
     if (fdt_setup(_fdt_addr) == 0) {
         return;
     }

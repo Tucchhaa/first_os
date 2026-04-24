@@ -186,7 +186,8 @@ class Kernel(Project):
             "src/sbi.c",
             "src/string.c",
             "src/utils.c",
-            "src/kernel/initrd.c",
+            "src/kernel/initrd/initrd.c",
+            "src/kernel/initrd/initrd_parser.c",
             "src/kernel/ds/linked_list.c",
             "src/kernel/mm/page_allocator.c",
             "src/kernel/mm/dynamic_allocator.c"
