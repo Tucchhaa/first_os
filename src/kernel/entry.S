@@ -1,4 +1,4 @@
-.section ".text"
+.section ".text.init"
 .globl _start
 .extern kmain
 

@@ -1,7 +1,7 @@
 #include "../uart.h"
 #include "../sbi.h"
 #include "../string.h"
-#include "../fdt.h"
+#include "../fdt/fdt.h"
 #include "../utils.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
@@ -10,15 +10,10 @@
 extern char __kernel_start;
 extern char __kernel_end;
 
-uintptr_t fdt_addr;
-
-struct fdt_node_cells fdt_cells;
-
 uintptr_t initrd_start_addr;
 uintptr_t initrd_end_addr;
 
 static void setup_uart(void);
-static void read_fdt(void);
 static void setup_initrd(void);
 static void setup_memory(void);
 
@@ -34,14 +29,11 @@ static void command_testmm4(void);
 static void command_testmm5(void);
 
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
-    fdt_addr = _fdt_addr;
-
-    if (fdt_check_magic(fdt_addr) == 0) {
+    if (fdt_setup(_fdt_addr) == 0) {
         return;
     }
 
     setup_uart();
-    read_fdt();
     setup_initrd();
     uart_puts("\n");
     
@@ -101,33 +93,11 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 }
 
-static void read_fdt(void) {
-    uart_puts("[KERNEL] Reading FDT");
-
-    uintptr_t root_node_addr = fdt_node_addr_by_path(fdt_addr, "/");
-    fdt_cells = fdt_get_node_cells(fdt_addr, root_node_addr);
-
-    if (fdt_cells.error) {
-        uart_puts("[KERNEL:ERROR] Could not get soc node cells\n");
-
-        // Fallback
-        fdt_cells.address = 2;
-        fdt_cells.size = 2;
-    } else {
-        uart_puts("[KERNEL] Reading FDT done");
-    }
-}
-
 static void setup_uart(void) {
-    uintptr_t soc_serial_node = fdt_node_addr_by_path(fdt_addr, "/soc/serial");
-    struct fdt_property * serial_reg_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, soc_serial_node, "reg")
-    );
+    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
 
-    uintptr_t uart_base = fdt_cells.address == 1
-        ? be32_to_cpu(*(uint32_t *)(&serial_reg_prop->data))
-        : be64_to_cpu(*(uint64_t *)(&serial_reg_prop->data));
-
+    uint64_t uart_base;
+    fdt_read_reg_property(soc_serial_node, &uart_base, (void*)0);
     uart_setup(uart_base);
 
     uart_puts("[KERNEL] UART configuration done\n\n");
@@ -136,13 +106,9 @@ static void setup_uart(void) {
 static void setup_initrd(void) {
     uart_puts("[KERNEL] Setting up initrd\n");
 
-    uintptr_t chosen_node = fdt_node_addr_by_path(fdt_addr, "/chosen");
-    struct fdt_property * initrd_start_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, chosen_node, "linux,initrd-start")
-    );
-    struct fdt_property * initrd_end_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, chosen_node, "linux,initrd-end")
-    );
+    uintptr_t chosen_node = fdt_node_addr_by_path("/chosen");
+    struct fdt_property * initrd_start_prop = fdt_property_by_name(chosen_node, "linux,initrd-start");
+    struct fdt_property * initrd_end_prop = fdt_property_by_name(chosen_node, "linux,initrd-end");
 
     if (initrd_start_prop == 0 || initrd_end_prop == 0) {
         uart_puts("[KERNEL] initrd-start or initrd_end prop is not found\n");
@@ -170,13 +136,11 @@ static void setup_memory(void) {
     uart_puts("[KERNEL] Setting up memory\n");
 
     // TODO: support several memory nodes
-    uintptr_t memory_node_addr = fdt_node_addr_by_path(fdt_addr, "/memory");
-    uintptr_t device_type_prop_addr = fdt_property_addr_by_name(fdt_addr, memory_node_addr, "device_type");
-    struct fdt_property * device_type_prop = fdt_property_at_addr(device_type_prop_addr);
+    uintptr_t memory_node_addr = fdt_node_addr_by_path("/memory");
+    struct fdt_property * device_type_prop = fdt_property_by_name(memory_node_addr, "device_type");
 
     if (
-        device_type_prop == 0
-        || streql("memory", &device_type_prop->data) == 0
+        device_type_prop == 0 || streql("memory", &device_type_prop->data) == 0
     ) {
         uart_puts("[KERNEL:ERROR] Unable to find memory node in FDT\n");
         return;
@@ -185,10 +149,7 @@ static void setup_memory(void) {
     {
         uint64_t memory_base = 0, memory_size = 0;
 
-        fdt_read_reg_property(
-            fdt_addr, memory_node_addr, fdt_cells.address, fdt_cells.size,
-            &memory_base, &memory_size
-        );
+        fdt_read_reg_property(memory_node_addr, &memory_base, &memory_size);
 
         char buf1[32], buf2[32];
         i64tox(memory_base, buf1);
@@ -199,7 +160,7 @@ static void setup_memory(void) {
     }
 
     {
-        uint64_t fdt_size = fdt_total_size(fdt_addr);
+        uint64_t fdt_size = fdt_total_size();
         uint64_t initrd_size = initrd_end_addr - initrd_start_addr;
         uint64_t kernel_size = (uint64_t)&__kernel_end - (uint64_t)&__kernel_start;
 
@@ -209,23 +170,14 @@ static void setup_memory(void) {
     }
 
     {
-        uintptr_t reserved_memory_node_addr = fdt_node_addr_by_path(fdt_addr, "/reserved-memory");
+        uintptr_t reserved_memory_node_addr = fdt_node_addr_by_path("/reserved-memory");
 
         if (reserved_memory_node_addr) {
             uintptr_t current_node = fdt_child_node(reserved_memory_node_addr);
 
             while (current_node != 0) {
-                struct fdt_property * reg_prop = fdt_property_at_addr(
-                    fdt_property_addr_by_name(fdt_addr, current_node, "reg")
-                );
-
                 uint64_t address, size;
-
-                fdt_read_reg_property(
-                    fdt_addr, current_node,
-                    fdt_cells.address, fdt_cells.size,
-                    &address, &size
-                );
+                fdt_read_reg_property(current_node, &address, &size);
 
                 memory_reserve(address, size);
 
@@ -276,12 +228,8 @@ static void command_info(void) {
 
 static void command_testfdt(void) {
     // interrupt-controller node
-    uintptr_t interrupt_controller_node = fdt_node_addr_by_path(
-        fdt_addr, "/cpus/cpu@0/interrupt-controller"
-    );
-    struct fdt_property * compatible_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, interrupt_controller_node, "compatible")
-    );
+    uintptr_t interrupt_controller_node = fdt_node_addr_by_path("/cpus/cpu@0/interrupt-controller");
+    struct fdt_property * compatible_prop = fdt_property_by_name(interrupt_controller_node, "compatible");
 
     if (compatible_prop == 0) {
         uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
@@ -302,15 +250,10 @@ static void command_testfdt(void) {
     }
 
     // memory node
-    uintptr_t memory_node = fdt_node_addr_by_path(
-        fdt_addr, "/memory"
-    );
+    uintptr_t memory_node = fdt_node_addr_by_path("/memory");
 
     uint64_t memory_base = 0, memory_size = 0;
-    fdt_read_reg_property(
-        fdt_addr, memory_node, fdt_cells.address, fdt_cells.size,
-        &memory_base, &memory_size
-    );
+    fdt_read_reg_property(memory_node, &memory_base, &memory_size);
 
     char buf1[32], buf2[32];
     i64tox(memory_base, buf1);

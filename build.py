@@ -112,11 +112,12 @@ class BootLoader(Project):
         self.name = "bootloader"
         self.linker_script = "linker_bootloader.ld"
         self.source_files = [
+            "src/fdt/fdt.c",
+            "src/fdt/fdt_parser.c",
             "src/bootloader/entry.S",
             "src/bootloader/bootloader.c",
             "src/uart.c",
             "src/string.c",
-            "src/fdt.c",
             "src/utils.c"
         ]
         self.ramdisk = "./src/kernel/ramdisk" # TODO: load ramdisk with the kernel instead of the bootloader
@@ -177,12 +178,13 @@ class Kernel(Project):
         self.name = "kernel"
         self.linker_script = "linker_kernel.ld"
         self.source_files = [
+            "src/fdt/fdt.c",
+            "src/fdt/fdt_parser.c",
             "src/kernel/entry.S",
             "src/kernel/kmain.c",
             "src/uart.c",
             "src/sbi.c",
             "src/string.c",
-            "src/fdt.c",
             "src/utils.c",
             "src/kernel/initrd.c",
             "src/kernel/ds/linked_list.c",

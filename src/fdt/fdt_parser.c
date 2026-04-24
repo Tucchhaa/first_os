@@ -1,6 +1,7 @@
+#include "fdt_parser.h"
 #include "fdt.h"
-#include "string.h"
-#include "utils.h"
+#include "../string.h"
+#include "../utils.h"
 
 /*
 Token values are already converted from big-endian to little-endian
@@ -49,39 +50,39 @@ static uintptr_t _fdt_next_token_addr(uintptr_t token_addr) {
     return next_token_addr;
 }
 
-uint32_t fdt_check_magic(uintptr_t fdt) {
-    struct fdt_header* header = (struct fdt_header*)fdt;
-    return header->magic == be32_to_cpu(0xd00dfeed);
-}
-
-uint64_t fdt_total_size(uintptr_t fdt) {
-    struct fdt_header* header = (struct fdt_header*)fdt;
-    return be32_to_cpu(header->totalsize);
-}
-
 const char * fdt_node_name(uintptr_t node_addr) {
     return (const char *)(node_addr + TOKEN_SIZE);
 }
 
-const char * _fdt_property_name(uintptr_t fdt, struct fdt_property * property) {
-    struct fdt_header* header = (struct fdt_header*)fdt;
+const char * fdt_property_name(struct fdt_property * property) {
+    uint32_t fdt_strings_offset = be32_to_cpu(fdt_header()->off_dt_strings);
     uint32_t nameoff = be32_to_cpu(property->nameoff);
 
-    return (char *)((uintptr_t)fdt + be32_to_cpu(header->off_dt_strings) + nameoff);
+    return (char *)(fdt_addr + fdt_strings_offset + nameoff);
 }
 
-uintptr_t _fdt_root_node(uintptr_t fdt) {
-    struct fdt_header* header = (struct fdt_header*)fdt;
-    uintptr_t start_addr = fdt + be32_to_cpu(header->off_dt_struct);
+uintptr_t fdt_root_node() {
+    uint32_t fdt_data_offset = be32_to_cpu(fdt_header()->off_dt_struct);
+    uintptr_t start_addr = fdt_addr + fdt_data_offset;
 
     if (*(uint32_t *)start_addr == FDT_TOKEN_BEGIN_NODE) {
         return start_addr;
     }
 
-    return _fdt_next_token_addr(start_addr);
+    uintptr_t token_addr = _fdt_next_token_addr(start_addr);
+
+    if (*(uint32_t *)token_addr == FDT_TOKEN_BEGIN_NODE) {
+        return token_addr;
+    }
+
+    return 0;
 }
 
 uintptr_t fdt_sibling_node(uintptr_t node_addr) {
+    if (node_addr == 0) {
+        return 0;
+    }
+
     uintptr_t current_addr = node_addr;
     int32_t depth = 1;
 
@@ -109,6 +110,10 @@ uintptr_t fdt_sibling_node(uintptr_t node_addr) {
 }
 
 uintptr_t fdt_child_node(uintptr_t node_addr) {
+    if (node_addr == 0) {
+        return 0;
+    }
+
     uintptr_t current_addr = node_addr;
 
     while (1) {
@@ -126,10 +131,42 @@ uintptr_t fdt_child_node(uintptr_t node_addr) {
     }
 }
 
+uintptr_t fdt_parent_node(uintptr_t node_addr) {
+    uintptr_t current_addr = fdt_root_node();
+
+    if (node_addr == 0 || node_addr == current_addr) {
+        return 0;
+    }
+
+    uintptr_t depth = 1;
+    uintptr_t parent_stack[32];
+    parent_stack[0] = 0;
+    parent_stack[1] = current_addr;
+
+    while (1) {
+        current_addr = _fdt_next_token_addr(current_addr);
+
+        if (*(uint32_t *)current_addr == FDT_TOKEN_BEGIN_NODE) {
+            parent_stack[depth + 1] = current_addr;
+            depth += 1;
+
+            if (current_addr == node_addr) {
+                return parent_stack[depth - 1];
+            }
+        }
+        else if (*(uint32_t *)current_addr == FDT_TOKEN_END_NODE) {
+            depth -= 1;
+        }
+        else if (*(uint32_t *)current_addr == FDT_TOKEN_END) {
+            return 0;
+        }
+    }
+}
+
 /// if addr is node address, then returns first property
 /// if addr is property address, then returns next property
 /// if there is no property found, returns 0
-uintptr_t _fdt_next_property_addr(uintptr_t addr) {
+static uintptr_t _fdt_next_property_addr(uintptr_t addr) {
     uintptr_t property_addr = _fdt_next_token_addr(addr);
 
     if (*(uint32_t *)property_addr == FDT_TOKEN_PROP) {
@@ -139,16 +176,8 @@ uintptr_t _fdt_next_property_addr(uintptr_t addr) {
     return 0;
 }
 
-struct fdt_property * fdt_property_at_addr(uintptr_t propert_addr) {
-    if (propert_addr == 0) {
-        return 0;
-    }
-
-    return (struct fdt_property *)(propert_addr + TOKEN_SIZE);
-}
-
-uintptr_t fdt_node_addr_by_path(uintptr_t fdt, const char * path) {
-    uintptr_t current_addr = _fdt_root_node(fdt);
+uintptr_t fdt_node_addr_by_path(const char * path) {
+    uintptr_t current_addr = fdt_root_node();
 
     if (current_addr == 0 || path[0] != '/') {
         return 0;
@@ -188,11 +217,7 @@ uintptr_t fdt_node_addr_by_path(uintptr_t fdt, const char * path) {
     }
 }
 
-uintptr_t fdt_property_addr_by_name(
-    uintptr_t fdt, 
-    uintptr_t node_addr,
-    const char * property_name
-) {
+struct fdt_property * fdt_property_by_name(uintptr_t node_addr, const char * property_name) {
     if (node_addr == 0) {
         return 0;
     }
@@ -206,45 +231,45 @@ uintptr_t fdt_property_addr_by_name(
             return 0;
         }
 
-        struct fdt_property * current_property = fdt_property_at_addr(current_addr);
-        const char * current_property_name = _fdt_property_name(fdt, current_property);
+        struct fdt_property * current_property = (struct fdt_property *)(current_addr + TOKEN_SIZE);
+        const char * current_property_name = fdt_property_name(current_property);
 
         if (streql(current_property_name, property_name)) {
-            return current_addr;
+            return current_property;
         }
     }
 }
 
-struct fdt_node_cells fdt_get_node_cells(uintptr_t fdt, uintptr_t node_addr) {
-    struct fdt_node_cells result;
+void fdt_get_node_cells(uintptr_t node_addr, uint32_t * address_cells, uint32_t * size_cells) {
+    uintptr_t current_addr = node_addr;
 
-    uintptr_t address_cells_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "#address-cells");
-    uintptr_t size_cells_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "#size-cells");
+    while (1) {
+        uintptr_t parent_node_addr = fdt_parent_node(current_addr);
 
-    struct fdt_property * address_cells_prop = fdt_property_at_addr(address_cells_prop_addr);
-    struct fdt_property * size_cells_prop = fdt_property_at_addr(size_cells_prop_addr);
-    
-    if (address_cells_prop == 0 || size_cells_prop == 0) {
-        result.error = 1;
-        result.address = 0;
-        result.size = 0;
-        return result;
+        if (node_addr == 0) {
+            *address_cells = 0;
+            *size_cells = 0;
+            return;
+        }
+
+        struct fdt_property * address_cells_prop = fdt_property_by_name(parent_node_addr, "#address-cells");
+        struct fdt_property * size_cells_prop = fdt_property_by_name(parent_node_addr, "#size-cells");
+
+        if (address_cells_prop != 0 && size_cells_prop != 0) {
+            *address_cells = be32_to_cpu(*(uint32_t *)(&address_cells_prop->data));
+            *size_cells = be32_to_cpu(*(uint32_t *)(&size_cells_prop->data));
+            return;
+        }
     }
+} 
 
-    result.error = 0;
-    result.address = be32_to_cpu(*(uint32_t *)(&address_cells_prop->data));
-    result.size = be32_to_cpu(*(uint32_t *)(&size_cells_prop->data));
+void fdt_read_reg_property(uintptr_t node_addr, uint64_t * address, uint64_t * size) {
+    struct fdt_property * reg_prop = fdt_property_by_name(node_addr, "reg");
 
-    return result;
-}
+    uint32_t address_cells;
+    uint32_t size_cells;
 
-void fdt_read_reg_property(
-    uintptr_t fdt, uintptr_t node_addr, 
-    uint32_t address_cells, uint32_t size_cells,
-    uint64_t * address, uint64_t * size
-) {
-    uintptr_t reg_prop_addr = fdt_property_addr_by_name(fdt, node_addr, "reg");
-    struct fdt_property * reg_prop = fdt_property_at_addr(reg_prop_addr);
+    fdt_get_node_cells(node_addr, &address_cells, &size_cells);
 
     if (reg_prop == 0) {
         *address = 0;
@@ -252,13 +277,17 @@ void fdt_read_reg_property(
         return;
     }
 
-    *address = address_cells == 1
-        ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
-        : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
+    if (address != (void *)0) {
+        *address = address_cells == 1
+            ? be32_to_cpu(*(uint32_t *)(&reg_prop->data))
+            : be64_to_cpu(*(uint64_t *)(&reg_prop->data));
+    }
 
-    uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
+    if (size != (void *)0) {
+        uintptr_t size_addr = (uintptr_t)&reg_prop->data + address_cells * sizeof(uint32_t);
 
-    *size = size_cells == 1
-        ? be32_to_cpu(*(uint32_t *)size_addr)
-        : be64_to_cpu(*(uint64_t *)size_addr);
+        *size = size_cells == 1
+            ? be32_to_cpu(*(uint32_t *)size_addr)
+            : be64_to_cpu(*(uint64_t *)size_addr);
+    }
 }

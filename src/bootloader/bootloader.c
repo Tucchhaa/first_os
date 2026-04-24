@@ -1,11 +1,10 @@
 #include "../platform.h"
 #include "../uart.h"
 #include "../string.h"
-#include "../fdt.h"
+#include "../fdt/fdt.h"
 #include "../utils.h"
 
 uint64_t hartid;
-uintptr_t fdt_addr;
 
 static void receive_kernel_bin(int kernel_size) {
     const uintptr_t KERNEL_ADDR = KERNEL_LOAD_ADDR;
@@ -15,7 +14,7 @@ static void receive_kernel_bin(int kernel_size) {
         uint8_t byte;
         uart_get_bytes((uint8_t *)&byte, sizeof(byte));
 
-        *(volatile uintptr_t *)(KERNEL_ADDR + loaded_bytes_count) = byte;
+        *(volatile uint8_t *)(KERNEL_ADDR + loaded_bytes_count) = byte;
         loaded_bytes_count += 1;
     }
 
@@ -45,30 +44,22 @@ static void cli(void) {
 }
 
 static void setup_uart() {
-    uintptr_t soc_node = fdt_node_addr_by_path(fdt_addr, "/soc");
-    struct fdt_property * soc_cell_address_cells_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, soc_node, "#address-cells")
-    );
-
-    uint32_t address_cells = be32_to_cpu(*(uint32_t *)(&soc_cell_address_cells_prop->data));
-
-    uintptr_t soc_serial_node = fdt_node_addr_by_path(fdt_addr, "/soc/serial");
-    struct fdt_property * serial_reg_prop = fdt_property_at_addr(
-        fdt_property_addr_by_name(fdt_addr, soc_serial_node, "reg")
-    );
-
-    uintptr_t uart_base = address_cells == 1
-        ? be32_to_cpu(*(uint32_t *)(&serial_reg_prop->data))
-        : be64_to_cpu(*(uint64_t *)(&serial_reg_prop->data));
-
+    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
+    uint64_t uart_base;
+    fdt_read_reg_property(soc_serial_node, &uart_base, (void*)0);
     uart_setup(uart_base);
+}
+
+static void setup_fallback_uart() {
+    uart_setup(UART_BASE);
 }
 
 void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
     hartid = _hartid;
-    fdt_addr = _fdt_addr;
 
-    if (fdt_check_magic(fdt_addr) == 0) {
+    // setup_fallback_uart();
+
+    if (fdt_setup(_fdt_addr) == 0) {
         return;
     }
 
