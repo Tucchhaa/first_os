@@ -4,25 +4,22 @@
 #include "../fdt/fdt.h"
 #include "../utils.h"
 #include "initrd/initrd.h"
+#include "mm/setup.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
 
-extern char __kernel_start;
-extern char __kernel_end;
-
-static void setup_memory(void);
-
 static void command_info(void);
-static void command_testfdt(void);
 static void command_ls(void);
 static void command_cat(const char * command);
-static void command_testmm(void);
-static void command_testmm1(void);
-static void command_testmm2(void);
-static void command_testmm3(void);
-static void command_testmm4(void);
-static void command_testmm5(void);
 
+/*
+TODO:
+- support multiple memory regions
+- clean up the kmain.c
+- optimize page allocator
+- use single linked list
+- implement self relocating bootloader
+*/
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {
         return;
@@ -43,6 +40,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         uart_puts("[KERNEL:INITRD] Could not setup initrd. Probably initramfs is not passed\n");
     }
     uart_puts("\n");
+
+    memory_setup();
     
     const int command_max_size = 100;
     char command[command_max_size];
@@ -57,15 +56,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("  info - print system info\n");
             uart_puts("  ls - print file system.\n");
             uart_puts("  cat <filepath> - print contents of a file.\n");
-            uart_puts("  testfdt - test fdt parser.\n");
-            uart_puts("  setupmm - setup memory allocator.\n");
-            uart_puts("  testmm - test memory allocator.\n");
         } 
         else if (streql(command, "info")) {
             command_info();
-        }
-        else if (streql(command, "testfdt")) {
-            command_testfdt();
         }
         else if (streql(command, "ls")) {
             command_ls();
@@ -73,103 +66,10 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         else if (streqln(command, "cat ", 4)) {
             command_cat(command);
         }
-        else if (streql(command, "setupmm")) {
-            setup_memory();
-        }
-        else if (streql(command, "testmm1")) {
-            command_testmm1();
-        }
-        else if (streql(command, "testmm2")) {
-            command_testmm2();
-        }
-        else if (streql(command, "testmm3")) {
-            command_testmm3();
-        }
-        else if (streql(command, "testmm4")) {
-            command_testmm4();
-        }
-        else if (streql(command, "testmm5")) {
-            command_testmm5();
-        }
-        else if (streql(command, "testmm")) {
-            command_testmm();
-        }
         else {
             uart_puts("Unknown command\n");
         }
     }
-}
-
-static void setup_memory(void) {
-    uart_puts("[KERNEL] Setting up memory\n");
-
-    // TODO: support several memory nodes
-    uintptr_t memory_node_addr = fdt_node_addr_by_path("/memory");
-    struct fdt_property * device_type_prop = fdt_property_by_name(memory_node_addr, "device_type");
-
-    if (
-        device_type_prop == 0 || streql("memory", &device_type_prop->data) == 0
-    ) {
-        uart_puts("[KERNEL:ERROR] Unable to find memory node in FDT\n");
-        return;
-    }
-
-    {
-        uint64_t memory_base = 0, memory_size = 0;
-
-        fdt_read_reg_property(memory_node_addr, &memory_base, &memory_size);
-
-        char buf1[32], buf2[32];
-        i64tox(memory_base, buf1);
-        i64tox(memory_size, buf2);
-        uart_puts_variadic("[KERNEL] insert memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
-
-        memory_add(memory_base, memory_size);
-    }
-
-    {
-        uint64_t fdt_size = fdt_total_size();
-        uint64_t initrd_size = initrd_end_addr - initrd_start_addr;
-        uint64_t kernel_size = (uint64_t)&__kernel_end - (uint64_t)&__kernel_start;
-
-        memory_reserve(fdt_addr, fdt_size);
-        memory_reserve(initrd_start_addr, initrd_size);
-        memory_reserve((uint64_t)&__kernel_start, kernel_size);
-    }
-
-    {
-        uintptr_t reserved_memory_node_addr = fdt_node_addr_by_path("/reserved-memory");
-
-        if (reserved_memory_node_addr) {
-            uintptr_t current_node = fdt_child_node(reserved_memory_node_addr);
-
-            while (current_node != 0) {
-                uint64_t address, size;
-                fdt_read_reg_property(current_node, &address, &size);
-
-                memory_reserve(address, size);
-
-                current_node = fdt_sibling_node(current_node);
-            }
-        }
-    }
-
-    if (memory_init()) {
-        uart_puts("[KERNEL:ERROR] error occurred during memory init\n");
-        return;
-    }
-    dynamic_allocator_init();
-
-    uart_puts("[KERNEL] Done setting up memory\n");
-
-    /*
-    TODO:
-    - support multiple memory regions
-    - clean up the kmain.c
-    - optimize page allocator
-    - use single linked list
-    - implement self relocating bootloader
-    */
 }
 
 static void command_info(void) {
@@ -192,52 +92,6 @@ static void command_info(void) {
     uart_puts_variadic("  implementation version: 0x", buf, "\n", 0);
     
     uart_puts("\n");
-}
-
-static void command_testfdt(void) {
-    // interrupt-controller node
-    uintptr_t interrupt_controller_node = fdt_node_addr_by_path("/cpus/cpu@0/interrupt-controller");
-    struct fdt_property * compatible_prop = fdt_property_by_name(interrupt_controller_node, "compatible");
-
-    if (compatible_prop == 0) {
-        uart_puts("/cpus/cpu@0/interrupt-controller[compatible] - not found\n");
-    } else {
-        char buf[40];
-        i32toa(be32_to_cpu(compatible_prop->len), buf);
-        uart_puts_variadic("property data len: ", buf, "\n\n", 0);
-
-        uart_puts("compatible: ");
-
-        uint32_t i = 0;
-
-        while (i < be32_to_cpu(compatible_prop->len)) {
-            uart_put(((const char *)&compatible_prop->data)[i]);
-            i += 1;
-        }
-        uart_puts("\n");
-    }
-
-    // memory node
-    uintptr_t memory_node = fdt_node_addr_by_path("/memory");
-
-    uint64_t memory_base = 0, memory_size = 0;
-    fdt_read_reg_property(memory_node, &memory_base, &memory_size);
-
-    char buf1[32], buf2[32];
-    i64tox(memory_base, buf1);
-    i64tox(memory_size, buf2);
-
-    uart_puts_variadic("memory: base=0x", buf1, " size=0x", buf2, "\n", 0);
-
-    // initrd
-    if (initrd_start_addr == 0) {
-        uart_puts("/chosen[linux,initrd-start] - not found\n");
-    } else {
-        char buf1[40], buf2[40];
-        i64tox(initrd_start_addr, buf1);
-        i64tox(initrd_end_addr, buf2);
-        uart_puts_variadic("initrd: start=0x", buf1, " end=0x", buf2, "\n", 0);
-    }
 }
 
 static void command_ls(void) {
@@ -319,154 +173,4 @@ static void command_cat(const char * command) {
     }
 
     uart_puts("File not found\n\n");
-}
-
-static void command_testmm1() {
-    uart_puts("Testing memory allocation...\n");
-    char *ptr1 = (char *)allocate(4000);
-    char *ptr2 = (char *)allocate(8000);
-    char *ptr3 = (char *)allocate(4000);
-    char *ptr4 = (char *)allocate(4000);
-
-    free(ptr1);
-    free(ptr2);
-    free(ptr3);
-    free(ptr4);
-}
-
-static void command_testmm2() {
-    /* Test kmalloc */
-    uart_puts("Testing dynamic allocator...\n");
-    char *kmem_ptr1 = (char *)allocate(16);
-    char *kmem_ptr2 = (char *)allocate(32);
-    char *kmem_ptr3 = (char *)allocate(64);
-    char *kmem_ptr4 = (char *)allocate(128);
-
-    free(kmem_ptr1);
-    free(kmem_ptr2);
-    free(kmem_ptr3);
-    free(kmem_ptr4);
-
-    char *kmem_ptr5 = (char *)allocate(16);
-    char *kmem_ptr6 = (char *)allocate(32);
-
-    free(kmem_ptr5);
-    free(kmem_ptr6);
-}
-
-static void command_testmm3() {
-    // Test allocate new page if the cache is not enough
-    void *kmem_ptr[102];
-    for (int i=0; i<25; i++) {
-        kmem_ptr[i] = (char *)allocate(512);
-    }
-    for (int i=0; i<25; i++) {
-        free(kmem_ptr[i]);
-    }
-}
-
-static void command_testmm4() {
-    // Test exceeding the maximum size
-    char *kmem_ptr7 = (char *)allocate(1 << 31);
-    if (kmem_ptr7 == 0) {
-        uart_puts("Allocation failed as expected for size > MAX_ALLOC_SIZE\n");
-    }
-    else {
-        uart_puts("Unexpected allocation success for size > MAX_ALLOC_SIZE\n");
-        free(kmem_ptr7);
-    }
-}
-
-static void command_testmm5() {
-    /***************** Case 1 *****************/
-
-    uart_puts("\n===== Part 1 =====\n");
-
-    void *p1 = allocate(4097);
-    free(p1);
-
-    uart_puts("\n=== Part 1 End ===\n");
-
-    uart_puts("\n===== Part 2 =====\n");
-
-    // Allocate all blocks at order 0, 1, 2 and 3
-    int NUM_BLOCKS_AT_ORDER_0 = 0;  // Need modified
-    int NUM_BLOCKS_AT_ORDER_1 = 0;
-    int NUM_BLOCKS_AT_ORDER_2 = 0;
-    int NUM_BLOCKS_AT_ORDER_3 = 0;
-
-    void *ps0[NUM_BLOCKS_AT_ORDER_0];
-    void *ps1[NUM_BLOCKS_AT_ORDER_1];
-    void *ps2[NUM_BLOCKS_AT_ORDER_2];
-    void *ps3[NUM_BLOCKS_AT_ORDER_3];
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_0; ++i) {
-        ps0[i] = allocate(4096);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_1; ++i) {
-        ps1[i] = allocate(8192);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_2; ++i) {
-        ps2[i] = allocate(16384);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_3; ++i) {
-        ps3[i] = allocate(32768);
-    }
-
-    uart_puts("\n-----------\n");
-
-    long MAX_BLOCK_SIZE = PAGE_SIZE * (1 << 22);
-
-    /* **DO NOT** uncomment this section */
-    void *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9, *p10;
-
-    p1 = allocate(4095);
-    free(p1);                        // 4095
-    p1 = allocate(4095);
-
-    p2 = allocate(3769);
-    p3 = allocate(2699);
-    p4 = allocate(1028);
-    p5 = allocate(1);
-    p6 = allocate(4096);
-    free(p5);                        // 1
-    p7 = allocate(16000);
-    free(p1);                        // 4095
-    free(p4);                        // 1028
-    free(p2);                        // 3769
-    p8 = allocate(4097);
-    p9 = allocate(MAX_BLOCK_SIZE + 1);
-    p10 = allocate(MAX_BLOCK_SIZE);
-    free(p6);                        // 4096
-    free(p8);                        // 4097
-    p2 = allocate(7197);
-
-    free(p10);                       // MAX_BLOCK_SIZE
-    free(p7);                        // 16000
-    free(p2);                        // 7197
-    free(p3);                        // 2699
-
-    uart_puts("\n-----------\n");
-
-    // Free all blocks remaining
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_0; ++i) {
-        free(ps0[i]);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_1; ++i) {
-        free(ps1[i]);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_2; ++i) {
-        free(ps2[i]);
-    }
-    for (int i = 0; i < NUM_BLOCKS_AT_ORDER_3; ++i) {
-        free(ps3[i]);
-    }
-
-    uart_puts("\n=== Part 2 End ===\n");
-}
-
-static void command_testmm() {
-    command_testmm1();
-    command_testmm2();
-    command_testmm3();
-    command_testmm4();
 }
