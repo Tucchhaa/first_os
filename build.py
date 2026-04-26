@@ -192,6 +192,8 @@ class Kernel(Project):
             "src/kernel/mm/setup.c",
             "src/kernel/mm/page_allocator.c",
             "src/kernel/mm/dynamic_allocator.c",
+            "src/kernel/interrupts/interrupts.c",
+            "src/kernel/interrupts/interrupts_entry.S",
         ]
 
 main()

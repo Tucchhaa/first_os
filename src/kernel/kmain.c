@@ -3,6 +3,7 @@
 #include "../string.h"
 #include "../fdt/fdt.h"
 #include "../utils.h"
+#include "interrupts/interrupts.h"
 #include "initrd/initrd.h"
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
@@ -11,6 +12,7 @@
 static void command_info(void);
 static void command_ls(void);
 static void command_cat(const char * command);
+static void command_exec(void);
 
 /*
 TODO:
@@ -42,6 +44,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     uart_puts("\n");
 
     memory_setup();
+    interrupts_setup();
     
     const int command_max_size = 100;
     char command[command_max_size];
@@ -56,6 +59,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("  info - print system info\n");
             uart_puts("  ls - print file system.\n");
             uart_puts("  cat <filepath> - print contents of a file.\n");
+            uart_puts("  exec - execute user program.\n");
         } 
         else if (streql(command, "info")) {
             command_info();
@@ -65,6 +69,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         }
         else if (streqln(command, "cat ", 4)) {
             command_cat(command);
+        }
+        else if (streql(command, "exec")) {
+            command_exec();
         }
         else {
             uart_puts("Unknown command\n");
@@ -110,7 +117,7 @@ static void command_ls(void) {
     }
 
     char buf[40];
-    i32toa(files_count, buf);
+    itoa(files_count, buf);
     uart_puts_variadic("Total ", buf, " files.\n", 0);
 
     // show all files
@@ -123,7 +130,7 @@ static void command_ls(void) {
         uint32_t file_data_size;
         initrd_get_filedata(file_addr, &file_data_size);
 
-        i32toa(file_data_size, buf);
+        itoa(file_data_size, buf);
         uart_puts(buf);
 
         int32_t space_count = 8 - kstrlen(buf);
@@ -173,4 +180,24 @@ static void command_cat(const char * command) {
     }
 
     uart_puts("File not found\n\n");
+}
+
+static void command_exec(void) {
+    uintptr_t file_addr = initrd_get_file_addr("./prog.bin");
+
+    if (file_addr == 0) {
+        uart_puts("Could not find user program\n");
+        return;
+    }
+
+    uint32_t data_size;
+    uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
+
+    char * proc_addr = allocate(4096);
+
+    for (uintptr_t i = 0; i < data_size; i += 1) {
+        proc_addr[i] = ((char *)file_data)[i];
+    }
+
+    interrupts_enter_umode((uintptr_t)proc_addr);
 }
