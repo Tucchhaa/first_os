@@ -6,12 +6,19 @@
 #include "csr.h"
 #include "plic.h"
 #include "../../platform.h"
-#include "../../uart.h"
+#include "../../uart_sync.h"
+#include "../uart/uart.h"
 #include "../../string.h"
 #include "../../fdt/fdt.h"
 #include "../../utils.h"
 #include "../sbi.h"
 #include "../mm/dynamic_allocator.h"
+
+struct cpuframe {
+    uint64_t regs[32];
+    uint64_t sepc;
+    uint64_t sstatus;
+};
 
 static struct cpuframe * cpuframe = 0;
 
@@ -32,7 +39,7 @@ uint32_t _read_cpu_frequency_from_fdt() {
 }
 
 void interrupts_setup() {
-    uart_puts("[KERNEL:INTERRUPTS] Setting up...\n");
+    uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
     cpuframe = allocate(sizeof(struct cpuframe));
 
@@ -50,14 +57,22 @@ void interrupts_setup() {
     cpu_frequency = _read_cpu_frequency_from_fdt();
 
     if (cpu_frequency == 0) {
-        uart_puts("[KERNEL:INTERRUPTS] /cpus[timebase-frequency] not found\n");
+        uart_sync_puts("[KERNEL:INTERRUPTS] /cpus[timebase-frequency] not found\n");
     } else {
-        csr_sie_enable(CSR_SIE_STIE);
         _interrupts_schedule();
     }
 
-    uart_puts("[KERNEL:INTERRUPTS] Done setting up\n");
+    uart_sync_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
+
+void interrupts_enable() { csr_sstatus_enable(CSR_SSTATUS_SIE); }
+uint64_t interrupts_disable() { return csr_sstatus_rdisable(CSR_SSTATUS_SIE); }
+
+void interrupts_enable_external() { csr_sie_enable(CSR_SIE_SEIE); }
+void interrupts_disable_external() { csr_sie_disable(CSR_SIE_SEIE); }
+
+void interrupts_enable_timer() { csr_sie_enable(CSR_SIE_STIE); }
+void interrupts_disable_timer() { csr_sie_disable(CSR_SIE_STIE); }
 
 void interrupts_enter_umode(uintptr_t proc_addr) {
     csr_sstatus_enable(CSR_SSTATUS_SPIE);
@@ -67,10 +82,7 @@ void interrupts_enter_umode(uintptr_t proc_addr) {
     csr_sret();
 }
 
-void _interrupts_schedule() {
-    uint64_t target_time = sbi_read_time() + (cpu_frequency * 10); // +2 seconds
-    sbi_set_timer(target_time);
-}
+void _interrupts_external_handler();
 
 void interrupts_handler() {
     uint64_t scause = csr_scause_get();
@@ -86,6 +98,7 @@ void interrupts_handler() {
         _interrupts_schedule();
         break;
     case ((1ULL << 63) | 9): // is_external
+        _interrupts_external_handler();
         break;
     default:
         register uint64_t stval;
@@ -107,5 +120,22 @@ void interrupts_handler() {
         // skip the ecall instruction
         cpuframe->sepc += 4;
         break;
+    }
+}
+
+void _interrupts_schedule() {
+    uint64_t target_time = sbi_read_time() + (cpu_frequency * 10); // +2 seconds
+    sbi_set_timer(target_time);
+}
+
+void _interrupts_external_handler() {
+    uint32_t irq = plic_claim();
+
+    if (irq == uart_irq) {
+        uart_irq_handler();
+    }
+
+    if (irq != 0) {
+        plic_complete(irq);
     }
 }

@@ -1,9 +1,6 @@
 #include "page_allocator.h"
 #include "../ds/linked_list.h"
 
-#include "../../string.h"
-#include "../../uart.h"
-
 // 16GB
 #define MAX_ORDERS 22
 

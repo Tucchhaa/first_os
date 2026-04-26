@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "../../uart.h"
+#include "../../uart_sync.h"
 #include "../../fdt/fdt.h"
 #include "../../string.h"
 #include "../initrd/initrd.h"
@@ -13,7 +13,7 @@ extern char __kernel_start;
 extern char __kernel_end;
 
 void memory_setup() {
-    uart_puts("[KERNEL] Setting up memory\n");
+    uart_sync_puts("[KERNEL] Setting up memory\n");
 
     // TODO: support several memory nodes
     uintptr_t memory_node_addr = fdt_node_addr_by_path("/memory");
@@ -22,7 +22,7 @@ void memory_setup() {
     if (
         device_type_prop == 0 || streql("memory", &device_type_prop->data) == 0
     ) {
-        uart_puts("[KERNEL:ERROR] Unable to find memory node in FDT\n");
+        uart_sync_puts("[KERNEL:ERROR] Unable to find memory node in FDT\n");
         return;
     }
 
@@ -34,7 +34,7 @@ void memory_setup() {
         char buf1[32], buf2[32];
         i64tox(memory_base, buf1);
         i64tox(memory_size, buf2);
-        uart_puts_variadic("[KERNEL] insert memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL] insert memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
 
         memory_add(memory_base, memory_size);
     }
@@ -48,18 +48,18 @@ void memory_setup() {
 
         i64tox(fdt_addr, buf1);
         i64tox(fdt_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve FDT memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL] reserve FDT memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve(fdt_addr, fdt_size);
 
 
         i64tox(initrd_start_addr, buf1);
         i64tox(initrd_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve INITRD memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL] reserve INITRD memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve(initrd_start_addr, initrd_size);
 
         i64tox(__kernel_start, buf1);
         i64tox(kernel_size, buf2);
-        uart_puts_variadic("[KERNEL] reserve Kernel memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL] reserve Kernel memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve((uint64_t)&__kernel_start, kernel_size);
     }
 
@@ -76,7 +76,7 @@ void memory_setup() {
                 char buf1[32], buf2[32];
                 i64tox(address, buf1);
                 i64tox(size, buf2);
-                uart_puts_variadic("[KERNEL] reserve memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
+                uart_sync_puts_variadic("[KERNEL] reserve memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
 
                 memory_reserve(address, size);
 
@@ -86,10 +86,10 @@ void memory_setup() {
     }
 
     if (memory_init() == 0) {
-        uart_puts("[KERNEL:ERROR] error occurred during memory init\n");
+        uart_sync_puts("[KERNEL:ERROR] error occurred during memory init\n");
         return;
     }
     dynamic_allocator_init();
 
-    uart_puts("[KERNEL] Done setting up memory\n");
+    uart_sync_puts("[KERNEL] Done setting up memory\n");
 }

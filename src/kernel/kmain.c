@@ -1,4 +1,4 @@
-#include "../uart.h"
+#include "../uart_sync.h"
 #include "../string.h"
 #include "../fdt/fdt.h"
 #include "../utils.h"
@@ -9,6 +9,7 @@
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
+#include "uart/uart.h"
 
 static void command_info(void);
 static void command_ls(void);
@@ -22,6 +23,8 @@ TODO:
 - optimize page allocator
 - use single linked list
 - implement self relocating bootloader
+- replace UART_STATUS_OFFSET with fdt read
+- rename utils.c to converters, and move some functions from string.c to converters.c
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {
@@ -29,27 +32,30 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 
     sbi_setup();
-    uart_setup();
+    uart_sync_setup();
 
     // char a[5];
-    // uart_getline(a, 2);
+    // uart_sync_getline(a, 2);
 
-    uart_puts("[KERNEL:INITRD] Setting up...\n");
+    uart_sync_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
         char buf[40];
         i64tox(initrd_start_addr, buf);
-        uart_puts_variadic("[KERNEL:INITRD] initrd-start addr: 0x", buf, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL:INITRD] initrd-start addr: 0x", buf, "\n", 0);
 
         i64tox(initrd_end_addr, buf);
-        uart_puts_variadic("[KERNEL:INITRD] initrd-end addr: 0x", buf, "\n", 0);
+        uart_sync_puts_variadic("[KERNEL:INITRD] initrd-end addr: 0x", buf, "\n", 0);
     } else {
-        uart_puts("[KERNEL:INITRD] Could not setup initrd. Probably initramfs is not passed\n");
+        uart_sync_puts("[KERNEL:INITRD] Could not setup initrd. Probably initramfs is not passed\n");
     }
-    uart_puts("\n");
+    uart_sync_puts("\n");
 
     memory_setup();
     interrupts_setup();
     plic_setup();
+    uart_setup();
+    interrupts_enable_external();
+    interrupts_enable_timer();
     
     // ===================
 

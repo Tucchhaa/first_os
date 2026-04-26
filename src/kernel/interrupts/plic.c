@@ -1,6 +1,6 @@
 #include "plic.h"
 
-#include "../../uart.h"
+#include "../../uart_sync.h"
 #include "../../fdt/fdt.h"
 #include "../../string.h"
 
@@ -24,12 +24,12 @@ static inline volatile uint32_t * plic_claim_reg(uint32_t ctx) {
 }
 
 void plic_setup() {
-    uart_puts("[KERNEL:PLIC] setting up...\n");
+    uart_sync_puts("[KERNEL:PLIC] setting up...\n");
 
     uintptr_t plic_node = fdt_node_addr_by_compatible("riscv,plic0");
 
     if (plic_node == 0) {
-        uart_puts("[KERNEL:PLIC] no node compatible with 'riscv,plic0' under /soc\n");
+        uart_sync_puts("[KERNEL:PLIC] no node compatible with 'riscv,plic0' under /soc\n");
         return;
     }
 
@@ -38,9 +38,9 @@ void plic_setup() {
 
     char buf[40];
     i64tox(_plic_addr, buf);
-    uart_puts_variadic("[KERNEL:PLIC] PLIC base: 0x", buf, "\n", 0);
+    uart_sync_puts_variadic("[KERNEL:PLIC] PLIC base: 0x", buf, "\n", 0);
 
-    uart_puts("[KERNEL:PLIC] Done setting up\n");
+    uart_sync_puts("[KERNEL:PLIC] Done setting up\n");
 }
 
 void plic_enable_irq(uint32_t irq, uint32_t priority) {

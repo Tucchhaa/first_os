@@ -116,7 +116,7 @@ class BootLoader(Project):
             "src/fdt/fdt_parser.c",
             "src/bootloader/entry.S",
             "src/bootloader/bootloader.c",
-            "src/uart.c",
+            "src/uart_sync.c",
             "src/string.c",
             "src/utils.c"
         ]
@@ -180,7 +180,7 @@ class Kernel(Project):
         self.source_files = [
             "src/fdt/fdt.c",
             "src/fdt/fdt_parser.c",
-            "src/uart.c",
+            "src/uart_sync.c",
             "src/string.c",
             "src/utils.c",
             "src/kernel/entry.S",
@@ -194,7 +194,8 @@ class Kernel(Project):
             "src/kernel/mm/dynamic_allocator.c",
             "src/kernel/interrupts/interrupts_entry.S",
             "src/kernel/interrupts/interrupts.c",
-            "src/kernel/interrupts/plic.c"
+            "src/kernel/interrupts/plic.c",
+            "src/kernel/uart/uart.c"
         ]
 
 main()
