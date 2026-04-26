@@ -52,3 +52,13 @@ struct sbiret sbi_get_impl_id(void) {
 struct sbiret sbi_get_impl_version(void) {
     return sbi_ecall_default(0x10, 0x2);
 }
+
+void sbi_set_timer(uint64_t target_time) {
+    sbi_ecall(0x54494D45, 0, target_time, 0, 0, 0, 0, 0);
+}
+
+uint64_t sbi_read_time() {
+    uint64_t value;
+    asm volatile ("rdtime %0" : "=r"(value));
+    return value;
+}
