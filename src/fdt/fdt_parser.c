@@ -62,7 +62,13 @@ const char * fdt_property_name(struct fdt_property * property) {
 }
 
 uintptr_t fdt_root_node() {
-    uint32_t fdt_data_offset = be32_to_cpu(fdt_header()->off_dt_struct);
+    struct fdt_header * header = fdt_header();
+
+    if (header == (void *)0) {
+        return 0;
+    }
+
+    uint32_t fdt_data_offset = be32_to_cpu(header->off_dt_struct);
     uintptr_t start_addr = fdt_addr + fdt_data_offset;
 
     if (*(uint32_t *)start_addr == FDT_TOKEN_BEGIN_NODE) {
@@ -217,6 +223,41 @@ uintptr_t fdt_node_addr_by_path(const char * path) {
     }
 }
 
+uintptr_t fdt_node_addr_by_compatible(const char * compatible) {
+    uintptr_t current_addr = fdt_root_node();
+
+    while (1) {
+        current_addr = _fdt_next_token_addr(current_addr);
+
+        if (*(uint32_t *)current_addr == FDT_TOKEN_BEGIN_NODE) {
+            struct fdt_property * compatible_prop = fdt_property_by_name(current_addr, "compatible");
+
+            if (compatible_prop == (void *)0) {
+                continue;
+            }
+
+            uint32_t len = be32_to_cpu(compatible_prop->len);
+            const char * s = (const char *)&compatible_prop->data;
+
+            uint32_t i = 0;
+
+            while (i < len) {
+                if (streql(&s[i], compatible)) {
+                    return current_addr;
+                }
+
+                while (i < len && s[i] != '\0') {
+                    i += 1;
+                }
+                i += 1;
+            }
+        }
+        else if (*(uint32_t *)current_addr == FDT_TOKEN_END) {
+            return 0;
+        }
+    }
+}
+
 struct fdt_property * fdt_property_by_name(uintptr_t node_addr, const char * property_name) {
     if (node_addr == 0) {
         return 0;
@@ -263,7 +304,7 @@ void fdt_get_node_cells(uintptr_t node_addr, uint32_t * address_cells, uint32_t 
     }
 } 
 
-void fdt_read_reg_property(uintptr_t node_addr, uint64_t * address, uint64_t * size) {
+void fdt_reg_property(uintptr_t node_addr, uint64_t * address, uint64_t * size) {
     struct fdt_property * reg_prop = fdt_property_by_name(node_addr, "reg");
 
     uint32_t address_cells;

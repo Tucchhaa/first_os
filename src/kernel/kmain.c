@@ -3,6 +3,7 @@
 #include "../fdt/fdt.h"
 #include "../utils.h"
 #include "sbi.h"
+#include "interrupts/plic.h"
 #include "interrupts/interrupts.h"
 #include "initrd/initrd.h"
 #include "mm/setup.h"
@@ -28,12 +29,10 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     }
 
     sbi_setup();
-
     uart_setup();
-    uart_puts("[KERNEL] UART was set uo\n\n");
 
-    char a[5];
-    uart_getline(a, 2);
+    // char a[5];
+    // uart_getline(a, 2);
 
     uart_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
@@ -50,6 +49,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
 
     memory_setup();
     interrupts_setup();
+    plic_setup();
     
     // ===================
 

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "csr.h"
+#include "plic.h"
 #include "../../platform.h"
 #include "../../uart.h"
 #include "../../string.h"
@@ -11,7 +12,6 @@
 #include "../../utils.h"
 #include "../sbi.h"
 #include "../mm/dynamic_allocator.h"
-// #include "../plic/plic.h"
 
 static struct cpuframe * cpuframe = 0;
 
@@ -68,12 +68,11 @@ void interrupts_enter_umode(uintptr_t proc_addr) {
 }
 
 void _interrupts_schedule() {
-    uint64_t target_time = sbi_read_time() + (cpu_frequency * 2); // +2 seconds
+    uint64_t target_time = sbi_read_time() + (cpu_frequency * 10); // +2 seconds
     sbi_set_timer(target_time);
 }
 
 void interrupts_handler() {
-    uart_puts("Interrupt occured\n");
     uint64_t scause = csr_scause_get();
 
     switch (scause)

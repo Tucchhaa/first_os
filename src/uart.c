@@ -11,10 +11,12 @@ void uart_setup() {
     uintptr_t uart_base_addr;
     uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
     
-    fdt_read_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
+    fdt_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
     
     _uart_base = (uint8_t *)uart_base_addr;
     _uart_status = (uint8_t *)(uart_base_addr + UART_STATUS_OFFSET);
+
+    uart_puts("[KERNEL:UART] Done setting up\n");
 }
 
 // Transmit Holding Register Empty

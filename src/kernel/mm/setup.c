@@ -29,7 +29,7 @@ void memory_setup() {
     {
         uint64_t memory_base = 0, memory_size = 0;
 
-        fdt_read_reg_property(memory_node_addr, &memory_base, &memory_size);
+        fdt_reg_property(memory_node_addr, &memory_base, &memory_size);
 
         char buf1[32], buf2[32];
         i64tox(memory_base, buf1);
@@ -71,7 +71,7 @@ void memory_setup() {
 
             while (current_node != 0) {
                 uint64_t address, size;
-                fdt_read_reg_property(current_node, &address, &size);
+                fdt_reg_property(current_node, &address, &size);
 
                 char buf1[32], buf2[32];
                 i64tox(address, buf1);
