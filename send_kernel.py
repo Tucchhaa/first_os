@@ -28,3 +28,4 @@ with serial.Serial(
 ) as tty:
     tty.write(header)
     tty.write(kernel_data)
+    tty.flush()

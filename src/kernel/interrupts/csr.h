@@ -23,10 +23,10 @@ STIE - timer interrupts enabled
 
 #include <stdint.h>
 
-typedef uint32_t csr_sie_flag;
+typedef uint64_t csr_sie_flag;
 const csr_sie_flag CSR_SIE_STIE = 1 << 5; // timer interrupts
 
-typedef uint32_t csr_sstatus_flag;
+typedef uint64_t csr_sstatus_flag;
 const csr_sstatus_flag CSR_SSTATUS_SIE = 1 << 1; // interrupts enabled
 const csr_sstatus_flag CSR_SSTATUS_SPIE = 1 << 5; // previous interrupts enabled
 const csr_sstatus_flag CSR_SSTATUS_SPP = 1 << 8; // CPU-mode before trap

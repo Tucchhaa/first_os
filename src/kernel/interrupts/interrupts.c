@@ -32,7 +32,7 @@ uint32_t _read_cpu_frequency_from_fdt() {
 }
 
 void interrupts_setup() {
-    uart_puts("[KERNEL:INTERRUPTS] Setting up interrupts\n");
+    uart_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
     cpuframe = allocate(sizeof(struct cpuframe));
 
@@ -44,7 +44,7 @@ void interrupts_setup() {
     csr_sscratch_set((uintptr_t)cpuframe);
     csr_stvec_set((uintptr_t)_interrupts_entry);
 
-    csr_sstatus_set(CSR_SSTATUS_SIE);
+    csr_sstatus_enable(CSR_SSTATUS_SIE);
 
     // read cpu frequency from fdt
     cpu_frequency = _read_cpu_frequency_from_fdt();
@@ -56,7 +56,7 @@ void interrupts_setup() {
         _interrupts_schedule();
     }
 
-    uart_puts("[KERNEL:INTERRUPTS] Done setting up interrupts\n");
+    uart_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
 
 void interrupts_enter_umode(uintptr_t proc_addr) {
@@ -69,11 +69,11 @@ void interrupts_enter_umode(uintptr_t proc_addr) {
 
 void _interrupts_schedule() {
     uint64_t target_time = sbi_read_time() + (cpu_frequency * 2); // +2 seconds
-
     sbi_set_timer(target_time);
 }
 
 void interrupts_handler() {
+    uart_puts("Interrupt occured\n");
     uint64_t scause = csr_scause_get();
 
     switch (scause)

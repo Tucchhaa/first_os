@@ -27,8 +27,13 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         return;
     }
 
+    sbi_setup();
+
     uart_setup();
     uart_puts("[KERNEL] UART was set uo\n\n");
+
+    char a[5];
+    uart_getline(a, 2);
 
     uart_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
@@ -46,6 +51,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     memory_setup();
     interrupts_setup();
     
+    // ===================
+
     const int command_max_size = 100;
     char command[command_max_size];
 

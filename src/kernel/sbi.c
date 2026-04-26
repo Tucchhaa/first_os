@@ -1,5 +1,7 @@
 #include "sbi.h"
 
+static uint32_t time_extension; 
+
 struct sbiret sbi_ecall(
     int ext, int fid,
     unsigned long arg0,
@@ -53,12 +55,18 @@ struct sbiret sbi_get_impl_version(void) {
     return sbi_ecall_default(0x10, 0x2);
 }
 
-void sbi_set_timer(uint64_t target_time) {
-    sbi_ecall(0x54494D45, 0, target_time, 0, 0, 0, 0, 0);
+struct sbiret sbi_set_timer(uint64_t target_time) {
+    return sbi_ecall(time_extension, 0x00, target_time, 0, 0, 0, 0, 0);
 }
 
 uint64_t sbi_read_time() {
     uint64_t value;
     asm volatile ("rdtime %0" : "=r"(value));
     return value;
+}
+
+void sbi_setup() {
+    struct sbiret time_ext_probe = sbi_probe_extension(SBI_TIME_EXTENSION);
+
+    time_extension = time_ext_probe.value ? SBI_TIME_EXTENSION : SBI_LEGACY_TIME_EXTENSION;
 }
