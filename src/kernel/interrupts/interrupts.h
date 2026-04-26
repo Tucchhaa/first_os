@@ -5,7 +5,7 @@
 void interrupts_setup();
 
 void interrupts_enable();
-uint64_t interrupts_disable();
+uint8_t interrupts_disable();
 
 void interrupts_enable_external();
 void interrupts_disable_external();

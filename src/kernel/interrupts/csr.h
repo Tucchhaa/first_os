@@ -32,18 +32,6 @@ typedef uint64_t csr_sie_flag;
 static const csr_sie_flag CSR_SIE_STIE = 1 << 5; // timer interrupts
 static const csr_sie_flag CSR_SIE_SEIE = 1 << 9; // supervisor external interrupt enable
 
-// static inline uint64_t disable_sie(void) {
-// uint64_t prev;
-// asm volatile("csrrc %0, sstatus, %1" : "=r"(prev) : "r"(1u << 1) : "memory");
-// return prev;
-// }
-
-// static inline void restore_sie(uint64_t prev) {
-// if (prev & (1u << 1)) {
-// asm volatile("csrs sstatus, %0" :: "r"(1u << 1) : "memory");
-// }
-// }
-
 static inline void csr_sstatus_enable(csr_sstatus_flag flag) {
     asm volatile("csrs sstatus, %0" :: "r"(flag) : "memory");
 }
@@ -52,10 +40,10 @@ static inline void csr_sstatus_disable(csr_sstatus_flag flag) {
     asm volatile("csrc sstatus, %0" :: "r"(flag) : "memory");
 }
 
-static inline uint64_t csr_sstatus_rdisable(csr_sstatus_flag flag) {
+static inline uint8_t csr_sstatus_rdisable(csr_sstatus_flag flag) {
     uint64_t prev;
     asm volatile("csrrc %0, sstatus, %1" : "=r"(prev) : "r"(flag) : "memory");
-    return prev & (1u << 1);
+    return !!(prev & flag);
 }
 
 static inline void csr_sstatus_set(csr_sstatus_flag flag) {

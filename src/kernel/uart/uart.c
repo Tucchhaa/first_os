@@ -5,18 +5,20 @@
 #include "../../platform.h"
 #include "../../fdt/fdt.h"
 #include "../../utils.h"
+#include "../../uart_sync.h"
+#include "../../string.h"
 #include "../interrupts/plic.h"
 #include "../interrupts/interrupts.h"
 
 #define RX_RING_SIZE 256
 #define TX_RING_SIZE 256
 
-static const uint8_t UART_IER_RX_AVAILABLE = (1u << 0);
-static const uint8_t UART_IER_THR_EMPTY = (1u << 1);
+static const uint32_t UART_IER_RX_AVAILABLE = (1u << 0);
+static const uint32_t UART_IER_THR_EMPTY = (1u << 1);
 
-static volatile uint8_t * _uart_base = 0;
-static volatile uint8_t * _uart_status = 0;
-static volatile uint8_t * _uart_ier = 0;
+static volatile uint32_t * _uart_base = 0;
+static volatile uint32_t * _uart_status = 0;
+static volatile uint32_t * _uart_ier = 0;
 
 uint32_t uart_irq = 0;
 
@@ -29,30 +31,37 @@ static volatile uint32_t tx_head;
 static volatile uint32_t tx_tail;
 
 // Transmit Holding Register Empty
-static inline int uart_status_thre(void) {
+static inline uint8_t uart_status_thre(void) {
     return !!(*_uart_status & (1u << 5));
 }
 
 // Data ready
-static inline int uart_status_dr(void) {
+static inline uint8_t uart_status_dr(void) {
     return !!(*_uart_status & (1u << 0));
 }
 
 void uart_setup() {
-    uintptr_t uart_base_addr;
+    uintptr_t uart_addr;
     uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
     
-    fdt_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
+    fdt_reg_property(soc_serial_node, &uart_addr, (void*)0);
     
-    _uart_base = (uint8_t *)uart_base_addr;
-    _uart_status = (uint8_t *)(uart_base_addr + UART_STATUS_OFFSET);
-    _uart_ier = (uint8_t *)(_uart_base + UART_IER_OFFSET);
+    _uart_base = (uint32_t *)uart_addr;
+    _uart_status = (uint32_t *)(uart_addr + UART_STATUS_OFFSET);
+    _uart_ier = (uint32_t *)(uart_addr + UART_IER_OFFSET);
+    
+    // volatile uint32_t *fcr = (volatile uint32_t *)(uart_addr + 0x08);
+    // *fcr = 0x07;  // FIFO enable + reset both RX and TX FIFOs
+
+    rx_head = rx_tail = 0;
+    tx_head = tx_tail = 0;
 
     struct fdt_property * irq_prop = fdt_property_by_name(soc_serial_node, "interrupts");
 
     if (irq_prop != 0) {
-        *_uart_ier = UART_IER_RX_AVAILABLE;
+        *_uart_ier |= UART_IER_RX_AVAILABLE;
         uart_irq = be32_to_cpu(*(uint32_t *)(&irq_prop->data));
+        // uart_irq = 38;
         plic_enable_irq(uart_irq, 1);
     }
 }
@@ -101,7 +110,8 @@ void uart_put(uint8_t b) {
             continue;
         }
 
-        uint64_t prev = interrupts_disable();
+        // TODO: it's possible to disable interrupts per string, not per byte
+        uint8_t prev = interrupts_disable();
 
         tx_ring[tx_head] = b;
         tx_head = next;
