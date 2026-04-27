@@ -46,6 +46,11 @@ static inline uint8_t csr_sstatus_rdisable(csr_sstatus_flag flag) {
     return !!(prev & flag);
 }
 
+static inline void csr_sstatus_set_flag(csr_sstatus_flag flag, uint64_t value) {
+    if (value) { csr_sstatus_enable(flag); }
+    else { csr_sstatus_disable(flag); } 
+}
+
 static inline void csr_sstatus_set(csr_sstatus_flag flag) {
     asm volatile("csrw sstatus, %0" :: "r"(flag) : "memory");
 }

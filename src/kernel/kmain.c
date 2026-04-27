@@ -5,6 +5,8 @@
 #include "sbi.h"
 #include "interrupts/plic.h"
 #include "interrupts/interrupts.h"
+#include "interrupts/timeouts.h"
+#include "process/process.h"
 #include "initrd/initrd.h"
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
@@ -15,6 +17,7 @@ static void command_info(void);
 static void command_ls(void);
 static void command_cat(const char * command);
 static void command_exec(void);
+static void command_settimeout(const char * command);
 
 /*
 TODO:
@@ -85,6 +88,9 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
         }
         else if (streql(command, "exec")) {
             command_exec();
+        }
+        else if (streqln(command, "settimeout ", 11)) {
+            command_settimeout(command);
         }
         else {
             uart_puts("Unknown command\n");
@@ -212,5 +218,48 @@ static void command_exec(void) {
         proc_addr[i] = ((char *)file_data)[i];
     }
 
-    interrupts_enter_umode((uintptr_t)proc_addr);
+    struct process * user_process = process_create((uintptr_t)proc_addr, 1);
+
+    process_switch(user_process);
+}
+
+static void timeout_func(void * arg) {
+    char * message = (char *)arg;
+
+    uart_puts(message);
+    uart_puts("\n");
+
+    free(arg);
+}
+
+static void command_settimeout(const char * command) {
+    char seconds_buf[20];
+    uint32_t seconds_offset = 11;
+    uint32_t seconds_len = 0;
+
+    while (is_numeric(command[seconds_offset + seconds_len])) {
+        seconds_buf[seconds_len] = command[seconds_offset + seconds_len];
+        seconds_len += 1;
+    }
+    seconds_buf[seconds_len] = '\0';
+
+    uint32_t seconds = atoi(seconds_buf);
+
+    char * message = allocate(100);
+    uint32_t message_offset = seconds_offset + seconds_len;
+    uint32_t message_len = 0;
+
+    while (command[message_offset + message_len] != '\0') {
+        message[message_len] = command[message_offset + message_len];
+        message_len += 1;
+    }
+    message[message_len] = '\0';
+
+    if (seconds_len == 0 || message_len == 0) {
+        uart_puts("Wrong parameters\n");
+        free(message);
+        return;
+    }
+
+    set_timeout(timeout_func, message, seconds * 1000);
 }

@@ -13,12 +13,12 @@
 #define RX_RING_SIZE 256
 #define TX_RING_SIZE 256
 
-static const uint32_t UART_IER_RX_AVAILABLE = (1u << 0);
-static const uint32_t UART_IER_THR_EMPTY = (1u << 1);
+static const uint8_t UART_IER_RX_AVAILABLE = (1u << 0);
+static const uint8_t UART_IER_THR_EMPTY = (1u << 1);
 
-static volatile uint32_t * _uart_base = 0;
-static volatile uint32_t * _uart_status = 0;
-static volatile uint32_t * _uart_ier = 0;
+static volatile uint8_t * _uart_base = 0;
+static volatile uint8_t * _uart_status = 0;
+static volatile uint8_t * _uart_ier = 0;
 
 uint32_t uart_irq = 0;
 
@@ -46,9 +46,9 @@ void uart_setup() {
     
     fdt_reg_property(soc_serial_node, &uart_addr, (void*)0);
     
-    _uart_base = (uint32_t *)uart_addr;
-    _uart_status = (uint32_t *)(uart_addr + UART_STATUS_OFFSET);
-    _uart_ier = (uint32_t *)(uart_addr + UART_IER_OFFSET);
+    _uart_base = (uint8_t *)uart_addr;
+    _uart_status = (uint8_t *)(uart_addr + UART_STATUS_OFFSET);
+    _uart_ier = (uint8_t *)(uart_addr + UART_IER_OFFSET);
     
     // volatile uint32_t *fcr = (volatile uint32_t *)(uart_addr + 0x08);
     // *fcr = 0x07;  // FIFO enable + reset both RX and TX FIFOs

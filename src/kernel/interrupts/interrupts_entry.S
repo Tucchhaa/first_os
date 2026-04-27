@@ -5,7 +5,7 @@
 _interrupts_entry:
   # --- [SAVE CPU STATE] ---
 
-  # --- sscratch is a pointer to cpu frame  ---
+  # --- sscratch is a pointer to struct process  ---
   csrrw t0, sscratch, t0
 
   sd x1, 8(t0)
@@ -54,6 +54,7 @@ _interrupts_entry:
   csrw sscratch, t0
 
   # --- [JUMP TO TRAP HANDLER] ---
+  mv a0, t0
   call interrupts_handler
 
   # --- [RESTORE CPU STATE] ---
@@ -63,6 +64,9 @@ _interrupts_entry:
 
   ld t1, 256(t0)
   csrw sepc, t1
+
+  ld t1, 264(t0)
+  csrw sstatus, t1
 
   ld x1, 8(t0)
   ld x2, 16(t0)
@@ -101,4 +105,3 @@ _interrupts_entry:
 
   # --- return control ---
   sret
-

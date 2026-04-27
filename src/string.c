@@ -48,6 +48,10 @@ void strslice(const char * s, char * buf, uint32_t offset, uint32_t n) {
     buf[i] = '\0';
 }
 
+uint8_t is_numeric(char s) {
+    return s >= '0' && s <= '9';
+}
+
 void _itox(int64_t x, char * const buf, int n) {
     const char hex[] = "0123456789abcdef";
 
@@ -129,4 +133,16 @@ void itoa(int64_t x, char * const buf) {
     }
 
     buf[i] = '\0';
+}
+
+uint64_t atoi(char * const buf) {
+    uint64_t result = 0;
+    uint32_t i = 0;
+
+    while (buf[i] != '\0') {
+        result = result * 10 + (buf[i] - '0');
+        i++;
+    }
+
+    return result;
 }

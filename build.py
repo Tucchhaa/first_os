@@ -195,6 +195,8 @@ class Kernel(Project):
             "src/kernel/interrupts/interrupts_entry.S",
             "src/kernel/interrupts/interrupts.c",
             "src/kernel/interrupts/plic.c",
+            "src/kernel/interrupts/timeouts.c",
+            "src/kernel/process/process.c",
             "src/kernel/uart/uart.c"
         ]
 

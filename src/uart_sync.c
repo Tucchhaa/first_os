@@ -4,8 +4,8 @@
 #include "platform.h"
 #include "fdt/fdt.h"
 
-static volatile uint32_t * _uart_base = 0;
-static volatile uint32_t * _uart_status = 0;
+static volatile uint8_t * _uart_base = 0;
+static volatile uint8_t * _uart_status = 0;
 
 void uart_sync_setup() {
     uintptr_t uart_base_addr;
@@ -13,8 +13,8 @@ void uart_sync_setup() {
     
     fdt_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
     
-    _uart_base = (uint32_t *)uart_base_addr;
-    _uart_status = (uint32_t *)(uart_base_addr + UART_STATUS_OFFSET);
+    _uart_base = (uint8_t *)uart_base_addr;
+    _uart_status = (uint8_t *)(uart_base_addr + UART_STATUS_OFFSET);
 
     uart_sync_puts("[KERNEL:UART] Done setting up\n");
 }

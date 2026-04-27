@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+struct process;
+
 void interrupts_setup();
 
 void interrupts_enable();
@@ -13,6 +15,4 @@ void interrupts_disable_external();
 void interrupts_enable_timer();
 void interrupts_disable_timer();
 
-void interrupts_enter_umode(uintptr_t proc_addr);
-
-void interrupts_handler();
+void interrupts_handler(struct process * process);
