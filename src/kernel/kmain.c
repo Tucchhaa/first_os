@@ -18,6 +18,7 @@ static void command_ls(void);
 static void command_cat(const char * command);
 static void command_exec(void);
 static void command_settimeout(const char * command);
+static void schedule_timeout(void *);
 
 /*
 TODO:
@@ -59,9 +60,10 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     uart_setup();
     interrupts_enable_external();
     interrupts_enable_timer();
-    
-    // ===================
 
+    // ===================
+    schedule_timeout(0);
+    
     const int command_max_size = 100;
     char command[command_max_size];
 
@@ -262,4 +264,12 @@ static void command_settimeout(const char * command) {
     }
 
     set_timeout(timeout_func, message, seconds * 1000);
+}
+
+static void schedule_timeout(void *) {
+    char c[40];
+    itoa((sbi_read_time() / cpu_frequency), c);
+    uart_puts_variadic("boot time: ", c , "\n", 0);
+
+    set_timeout(schedule_timeout, (void *)0, 10000);
 }

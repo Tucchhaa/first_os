@@ -8,7 +8,7 @@
 #include "../../utils.h"
 #include "../sbi.h"
 
-static uint32_t cpu_frequency = 0;
+uint32_t cpu_frequency = 0;
 
 static struct linked_list timeout_queue;
 
