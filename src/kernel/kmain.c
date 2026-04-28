@@ -58,6 +58,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     interrupts_setup();
     plic_setup();
     uart_setup();
+    interrupts_enable();
     interrupts_enable_external();
     interrupts_enable_timer();
 
@@ -78,6 +79,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
             uart_puts("  ls - print file system.\n");
             uart_puts("  cat <filepath> - print contents of a file.\n");
             uart_puts("  exec - execute user program.\n");
+            uart_puts("  settimeout <seconds> <message> - prints message after seconds\n");
         } 
         else if (streql(command, "info")) {
             command_info();

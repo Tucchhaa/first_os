@@ -16,9 +16,12 @@
 static const uint8_t UART_IER_RX_AVAILABLE = (1u << 0);
 static const uint8_t UART_IER_THR_EMPTY = (1u << 1);
 
+static const uint8_t UART_MCR_OUT2 = (1u << 3);
+
 static volatile uint8_t * _uart_base = 0;
 static volatile uint8_t * _uart_status = 0;
 static volatile uint8_t * _uart_ier = 0;
+static volatile uint8_t * _uart_mcr = 0;
 
 uint32_t uart_irq = 0;
 
@@ -49,9 +52,7 @@ void uart_setup() {
     _uart_base = (uint8_t *)uart_addr;
     _uart_status = (uint8_t *)(uart_addr + UART_STATUS_OFFSET);
     _uart_ier = (uint8_t *)(uart_addr + UART_IER_OFFSET);
-    
-    // volatile uint32_t *fcr = (volatile uint32_t *)(uart_addr + 0x08);
-    // *fcr = 0x07;  // FIFO enable + reset both RX and TX FIFOs
+    _uart_mcr = (uint8_t *)(uart_addr + UART_MCR_OFFSET);
 
     rx_head = rx_tail = 0;
     tx_head = tx_tail = 0;
@@ -60,6 +61,7 @@ void uart_setup() {
 
     if (irq_prop != 0) {
         *_uart_ier |= UART_IER_RX_AVAILABLE;
+        *_uart_mcr |= UART_MCR_OUT2;
         uart_irq = be32_to_cpu(*(uint32_t *)(&irq_prop->data));
         // uart_irq = 38;
         plic_enable_irq(uart_irq, 1);

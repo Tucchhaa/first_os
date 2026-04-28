@@ -23,7 +23,6 @@ void interrupts_setup() {
 
     csr_sscratch_set((uintptr_t)kernel_process);
     csr_stvec_set((uintptr_t)_interrupts_entry);
-    csr_sstatus_enable(CSR_SSTATUS_SIE);
 
     timeouts_setup();
 
