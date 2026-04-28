@@ -10,8 +10,8 @@
 #include "../interrupts/plic.h"
 #include "../interrupts/interrupts.h"
 
-#define RX_RING_SIZE 256
-#define TX_RING_SIZE 256
+#define RX_RING_SIZE 512
+#define TX_RING_SIZE 512
 
 static const uint8_t UART_IER_RX_AVAILABLE = (1u << 0);
 static const uint8_t UART_IER_THR_EMPTY = (1u << 1);
