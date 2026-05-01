@@ -1,6 +1,6 @@
 #include "plic.h"
 
-#include "../../uart_sync.h"
+#include "../../uart/uart_sync.h"
 #include "../../fdt/fdt.h"
 #include "../../string.h"
 #include "../../converters.h"

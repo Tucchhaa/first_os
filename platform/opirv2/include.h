@@ -1,7 +1,3 @@
 #pragma once
 
 #define KERNEL_LOAD_ADDR 0x20000000
-#define UART_BASE 0xD4017000 // not used
-#define UART_STATUS_OFFSET 0x14
-#define UART_IER_OFFSET 0x4
-#define UART_MCR_OFFSET 0x10 // modem control register

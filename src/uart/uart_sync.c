@@ -1,37 +1,23 @@
+#include "uart_sync.h"
+
 #include <stdarg.h>
 
-#include "uart_sync.h"
-#include "platform.h"
-#include "fdt/fdt.h"
+#include "_uart_regs.h"
+#include "../fdt/fdt.h"
 
-static volatile uint8_t * _uart_base = 0;
-static volatile uint8_t * _uart_status = 0;
+static struct uart_regs _uart_regs;
 
 void uart_sync_setup() {
-    uintptr_t uart_base_addr;
-    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
+    uintptr_t serial_node = fdt_node_addr_by_path("/soc/serial");
     
-    fdt_reg_property(soc_serial_node, &uart_base_addr, (void*)0);
-    
-    _uart_base = (uint8_t *)uart_base_addr;
-    _uart_status = (uint8_t *)(uart_base_addr + UART_STATUS_OFFSET);
+    _uart_regs = uart_get_regs(serial_node);
 
     uart_sync_puts("[KERNEL:UART] Done setting up\n");
 }
 
-// Transmit Holding Register Empty
-static inline int uart_status_thre(void) {
-    return !!(*_uart_status & (1u << 5));
-}
-
-// Data ready
-static inline int uart_status_dr(void) {
-    return !!(*_uart_status & (1u << 0));
-}
-
 uint8_t uart_sync_get(void) {
-    while(!uart_status_dr()) { }
-    return *_uart_base;
+    while(!uart_status_dr(&_uart_regs)) { }
+    return *_uart_regs.base;
 }
 
 void uart_sync_get_bytes(uint8_t * buf, int n) {
@@ -41,8 +27,8 @@ void uart_sync_get_bytes(uint8_t * buf, int n) {
 }
 
 void uart_sync_put(uint8_t b) {
-    while(!uart_status_thre()) { }
-    *_uart_base = b;
+    while(!uart_status_thre(&_uart_regs)) { }
+    *_uart_regs.base = b;
 }
 
 void uart_sync_puts(const char * str) {

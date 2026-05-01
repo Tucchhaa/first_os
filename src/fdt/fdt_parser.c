@@ -223,6 +223,32 @@ uintptr_t fdt_node_addr_by_path(const char * path) {
     }
 }
 
+uint8_t fdt_node_is_compatible(uintptr_t node_addr, const char * compatible) {
+    struct fdt_property * compatible_prop = fdt_property_by_name(node_addr, "compatible");
+
+    if (compatible_prop == (void *)0) {
+        return 0;
+    }
+
+    uint32_t len = be32_to_cpu(compatible_prop->len);
+    const char * s = (const char *)&compatible_prop->data;
+
+    uint32_t i = 0;
+
+    while (i < len) {
+        if (streql(&s[i], compatible)) {
+            return node_addr;
+        }
+
+        while (i < len && s[i] != '\0') {
+            i += 1;
+        }
+        i += 1;
+    }
+
+    return 0;
+}
+
 uintptr_t fdt_node_addr_by_compatible(const char * compatible) {
     uintptr_t current_addr = fdt_root_node();
 
@@ -230,26 +256,8 @@ uintptr_t fdt_node_addr_by_compatible(const char * compatible) {
         current_addr = _fdt_next_token_addr(current_addr);
 
         if (*(uint32_t *)current_addr == FDT_TOKEN_BEGIN_NODE) {
-            struct fdt_property * compatible_prop = fdt_property_by_name(current_addr, "compatible");
-
-            if (compatible_prop == (void *)0) {
-                continue;
-            }
-
-            uint32_t len = be32_to_cpu(compatible_prop->len);
-            const char * s = (const char *)&compatible_prop->data;
-
-            uint32_t i = 0;
-
-            while (i < len) {
-                if (streql(&s[i], compatible)) {
-                    return current_addr;
-                }
-
-                while (i < len && s[i] != '\0') {
-                    i += 1;
-                }
-                i += 1;
+            if (fdt_node_is_compatible(current_addr, compatible)) {
+                return current_addr;
             }
         }
         else if (*(uint32_t *)current_addr == FDT_TOKEN_END) {

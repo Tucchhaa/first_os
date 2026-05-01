@@ -4,7 +4,7 @@
 #include "../ds/linked_list.h"
 #include "../mm/dynamic_allocator.h"
 #include "../../fdt/fdt.h"
-#include "../../uart_sync.h"
+#include "../../uart/uart_sync.h"
 #include "../../converters.h"
 #include "../sbi.h"
 

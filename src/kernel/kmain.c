@@ -1,4 +1,5 @@
-#include "../uart_sync.h"
+#include "../uart/uart_sync.h"
+#include "../uart/uart.h"
 #include "../string.h"
 #include "../fdt/fdt.h"
 #include "../converters.h"
@@ -11,7 +12,6 @@
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
-#include "uart/uart.h"
 
 static void command_info(void);
 static void command_ls(void);
@@ -27,8 +27,7 @@ TODO:
 - optimize page allocator
 - use single linked list
 - implement self relocating bootloader
-- replace UART_STATUS_OFFSET with fdt read
-- implement tested interrupts
+- implement nested interrupts
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {

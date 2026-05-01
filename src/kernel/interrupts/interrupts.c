@@ -7,8 +7,8 @@
 #include "plic.h"
 #include "timeouts.h"
 #include "../process/process.h"
-#include "../../uart_sync.h"
-#include "../uart/uart.h"
+#include "../../uart/uart_sync.h"
+#include "../../uart/uart.h"
 #include "../../string.h"
 #include "../../converters.h"
 

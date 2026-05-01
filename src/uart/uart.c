@@ -2,26 +2,17 @@
 
 #include <stdarg.h>
 
-#include "../../platform.h"
-#include "../../fdt/fdt.h"
-#include "../../converters.h"
-#include "../../uart_sync.h"
-#include "../../string.h"
-#include "../interrupts/plic.h"
-#include "../interrupts/interrupts.h"
+#include "_uart_regs.h"
+#include "../fdt/fdt.h"
+#include "../converters.h"
+#include "../string.h"
+#include "../kernel/interrupts/plic.h"
+#include "../kernel/interrupts/interrupts.h"
 
 #define RX_RING_SIZE 512
 #define TX_RING_SIZE 512
 
-static const uint8_t UART_IER_RX_AVAILABLE = (1u << 0);
-static const uint8_t UART_IER_THR_EMPTY = (1u << 1);
-
-static const uint8_t UART_MCR_OUT2 = (1u << 3);
-
-static volatile uint8_t * _uart_base = 0;
-static volatile uint8_t * _uart_status = 0;
-static volatile uint8_t * _uart_ier = 0;
-static volatile uint8_t * _uart_mcr = 0;
+static struct uart_regs _uart_regs;
 
 uint32_t uart_irq = 0;
 
@@ -33,44 +24,27 @@ static volatile uint8_t tx_ring[TX_RING_SIZE];
 static volatile uint32_t tx_head;
 static volatile uint32_t tx_tail;
 
-// Transmit Holding Register Empty
-static inline uint8_t uart_status_thre(void) {
-    return !!(*_uart_status & (1u << 5));
-}
-
-// Data ready
-static inline uint8_t uart_status_dr(void) {
-    return !!(*_uart_status & (1u << 0));
-}
-
 void uart_setup() {
-    uintptr_t uart_addr;
-    uintptr_t soc_serial_node = fdt_node_addr_by_path("/soc/serial");
+    uintptr_t serial_node = fdt_node_addr_by_path("/soc/serial");
     
-    fdt_reg_property(soc_serial_node, &uart_addr, (void*)0);
-    
-    _uart_base = (uint8_t *)uart_addr;
-    _uart_status = (uint8_t *)(uart_addr + UART_STATUS_OFFSET);
-    _uart_ier = (uint8_t *)(uart_addr + UART_IER_OFFSET);
-    _uart_mcr = (uint8_t *)(uart_addr + UART_MCR_OFFSET);
+    _uart_regs = uart_get_regs(serial_node);
 
     rx_head = rx_tail = 0;
     tx_head = tx_tail = 0;
 
-    struct fdt_property * irq_prop = fdt_property_by_name(soc_serial_node, "interrupts");
+    struct fdt_property * irq_prop = fdt_property_by_name(serial_node, "interrupts");
 
     if (irq_prop != 0) {
-        *_uart_ier |= UART_IER_RX_AVAILABLE;
-        *_uart_mcr |= UART_MCR_OUT2;
+        *_uart_regs.ier |= UART_IER_RX_AVAILABLE;
+        *_uart_regs.mcr |= UART_MCR_OUT2;
         uart_irq = be32_to_cpu(*(uint32_t *)(&irq_prop->data));
-        // uart_irq = 38;
         plic_enable_irq(uart_irq, 1);
     }
 }
 
 void uart_irq_handler() {
-    while (uart_status_dr()) {
-        uint8_t c = *_uart_base;
+    while (uart_status_dr(&_uart_regs)) {
+        uint8_t c = *_uart_regs.base;
         uint32_t next = (rx_head + 1) % RX_RING_SIZE;
 
         if (next != rx_tail) {
@@ -80,14 +54,14 @@ void uart_irq_handler() {
         // Overflow: drop byte.
     }
 
-    while (uart_status_thre()) {
+    while (uart_status_thre(&_uart_regs)) {
         if (tx_head == tx_tail) {
             // Ring drained: stop asking for THR-empty interrupts.
-            *_uart_ier &= ~UART_IER_THR_EMPTY;
+            *_uart_regs.ier &= ~UART_IER_THR_EMPTY;
             break;
         }
 
-        *_uart_base = tx_ring[tx_tail];
+        *_uart_regs.base = tx_ring[tx_tail];
         tx_tail = (tx_tail + 1) % TX_RING_SIZE;
     }
 }
@@ -117,7 +91,7 @@ void uart_put(uint8_t b) {
 
         tx_ring[tx_head] = b;
         tx_head = next;
-        *_uart_ier |= UART_IER_THR_EMPTY;
+        *_uart_regs.ier |= UART_IER_THR_EMPTY;
 
         if (prev) {
             interrupts_enable();

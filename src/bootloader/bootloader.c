@@ -1,5 +1,5 @@
 #include "../platform.h"
-#include "../uart_sync.h"
+#include "../uart/uart_sync.h"
 #include "../fdt/fdt.h"
 
 uint64_t hartid;

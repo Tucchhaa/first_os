@@ -21,6 +21,8 @@ uintptr_t fdt_parent_node(uintptr_t node_addr);
 /// returns address of a node at the path
 uintptr_t fdt_node_addr_by_path(const char * path);
 
+uint8_t fdt_node_is_compatible(uintptr_t node_addr, const char * compatible);
+
 uintptr_t fdt_node_addr_by_compatible(const char * compatible);
 
 struct fdt_property * fdt_property_by_name(uintptr_t node_addr, const char * property_name);
