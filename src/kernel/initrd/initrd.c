@@ -1,7 +1,7 @@
 #include "initrd.h"
 
 #include "../../fdt/fdt.h"
-#include "../../utils.h"
+#include "../../converters.h"
 
 uintptr_t initrd_start_addr;
 uintptr_t initrd_end_addr;

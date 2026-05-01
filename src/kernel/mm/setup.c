@@ -5,6 +5,7 @@
 #include "../../uart_sync.h"
 #include "../../fdt/fdt.h"
 #include "../../string.h"
+#include "../../converters.h"
 #include "../initrd/initrd.h"
 #include "page_allocator.h"
 #include "dynamic_allocator.h"

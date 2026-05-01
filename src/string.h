@@ -13,11 +13,3 @@ void strslice(const char * s, char * buf, uint32_t index, uint32_t n);
 
 uint8_t is_numeric(char s);
 
-void i64tox(int64_t x, char * const buf);
-void i32tox(int32_t x, char * const buf);
-void i8tox(int8_t x, char * const buf);
-
-uint32_t xtoi32(char * const buf);
-
-void itoa(int64_t, char * const buf);
-uint64_t atoi(char * const buf);

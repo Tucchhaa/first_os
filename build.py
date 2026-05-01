@@ -118,7 +118,7 @@ class BootLoader(Project):
             "src/bootloader/bootloader.c",
             "src/uart_sync.c",
             "src/string.c",
-            "src/utils.c"
+            "src/converters.c"
         ]
         self.ramdisk = "./src/kernel/ramdisk" # TODO: load ramdisk with the kernel instead of the bootloader
 
@@ -182,7 +182,7 @@ class Kernel(Project):
             "src/fdt/fdt_parser.c",
             "src/uart_sync.c",
             "src/string.c",
-            "src/utils.c",
+            "src/converters.c",
             "src/kernel/entry.S",
             "src/kernel/kmain.c",
             "src/kernel/sbi.c",

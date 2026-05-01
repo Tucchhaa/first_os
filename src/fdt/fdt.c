@@ -1,6 +1,6 @@
 #include "fdt.h"
 
-#include "../utils.h"
+#include "../converters.h"
 
 uintptr_t fdt_addr = 0;
 

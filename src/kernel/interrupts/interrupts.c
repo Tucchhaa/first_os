@@ -10,7 +10,7 @@
 #include "../../uart_sync.h"
 #include "../uart/uart.h"
 #include "../../string.h"
-#include "../../utils.h"
+#include "../../converters.h"
 
 static struct process * kernel_process;
 

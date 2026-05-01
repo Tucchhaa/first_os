@@ -5,7 +5,7 @@
 #include "../mm/dynamic_allocator.h"
 #include "../../fdt/fdt.h"
 #include "../../uart_sync.h"
-#include "../../utils.h"
+#include "../../converters.h"
 #include "../sbi.h"
 
 uint32_t cpu_frequency = 0;

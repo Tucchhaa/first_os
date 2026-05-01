@@ -1,7 +1,7 @@
 #include "fdt_parser.h"
 #include "fdt.h"
 #include "../string.h"
-#include "../utils.h"
+#include "../converters.h"
 
 /*
 Token values are already converted from big-endian to little-endian

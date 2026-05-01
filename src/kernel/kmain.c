@@ -1,7 +1,7 @@
 #include "../uart_sync.h"
 #include "../string.h"
 #include "../fdt/fdt.h"
-#include "../utils.h"
+#include "../converters.h"
 #include "sbi.h"
 #include "interrupts/plic.h"
 #include "interrupts/interrupts.h"
@@ -28,7 +28,7 @@ TODO:
 - use single linked list
 - implement self relocating bootloader
 - replace UART_STATUS_OFFSET with fdt read
-- rename utils.c to converters, and move some functions from string.c to converters.c
+- implement tested interrupts
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {

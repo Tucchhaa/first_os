@@ -2,6 +2,7 @@
 
 #include "initrd.h"
 #include "../../string.h"
+#include "../../converters.h"
 
 struct cpio_newc_header {
     char c_magic[6];

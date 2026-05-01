@@ -3,6 +3,7 @@
 #include "../../uart_sync.h"
 #include "../../fdt/fdt.h"
 #include "../../string.h"
+#include "../../converters.h"
 
 static uint32_t _hart_ctx = 1;
 static uintptr_t _plic_addr;

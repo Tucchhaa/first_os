@@ -4,7 +4,7 @@
 
 #include "../../platform.h"
 #include "../../fdt/fdt.h"
-#include "../../utils.h"
+#include "../../converters.h"
 #include "../../uart_sync.h"
 #include "../../string.h"
 #include "../interrupts/plic.h"
