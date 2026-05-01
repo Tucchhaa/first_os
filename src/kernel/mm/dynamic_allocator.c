@@ -9,8 +9,8 @@ struct pool {
 };
 
 # define POOLS_SIZE 9
-uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024, 2048 };
-struct pool pools[POOLS_SIZE];
+static uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024, 2048 };
+static struct pool pools[POOLS_SIZE];
 
 void dynamic_allocator_init(void) {
     for (int i=0; i < POOLS_SIZE; i++) {
@@ -19,7 +19,7 @@ void dynamic_allocator_init(void) {
     }
 }
 
-uint8_t _get_pool_index(uint32_t size) {
+static uint8_t _get_pool_index(uint32_t size) {
     for (int i = 0; i < POOLS_SIZE; i++) {
         if (pools[i].chunk_size >= size) {
             return i;

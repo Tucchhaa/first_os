@@ -4,29 +4,29 @@
 // 16GB
 #define MAX_ORDERS 22
 
-const uint8_t PAGE_FLAG_FREE = 1 << 0;
-const uint8_t PAGE_FLAG_ALLOCATED = 1 << 1;
-const uint8_t PAGE_FLAG_RESERVED = 1 << 2;
+static const uint8_t PAGE_FLAG_FREE = 1 << 0;
+static const uint8_t PAGE_FLAG_ALLOCATED = 1 << 1;
+static const uint8_t PAGE_FLAG_RESERVED = 1 << 2;
 
 struct memory_region {
     uintptr_t addr;
     uint64_t size;
 };
 
-uint32_t available_memory_length = 0;
-uint32_t available_memory_max_length = 10;
-struct memory_region available_memory[10];
+static uint32_t available_memory_length = 0;
+static uint32_t available_memory_max_length = 10;
+static struct memory_region available_memory[10];
 
-uint32_t reserved_memory_length = 0;
-uint32_t reserved_memory_max_length = 10;
-struct memory_region reserved_memory[100];
+static uint32_t reserved_memory_length = 0;
+static uint32_t reserved_memory_max_length = 10;
+static struct memory_region reserved_memory[100];
 
-uint32_t frame_array_length = 0;
-struct page * frame_array;
+static uint32_t frame_array_length = 0;
+static struct page * frame_array;
 
-struct linked_list orders_lists[MAX_ORDERS];
+static struct linked_list orders_lists[MAX_ORDERS];
 
-uintptr_t memory_base_addr;
+static uintptr_t memory_base_addr;
 
 static inline uint32_t _get_page_index(uintptr_t page_addr) {
     // TODO: convert to bit operation

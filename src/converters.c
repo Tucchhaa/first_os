@@ -18,7 +18,7 @@ uint64_t be64_to_cpu(uint64_t x) {
            ((x & 0x00000000000000FFULL) << 56);
 }
 
-void _itox(int64_t x, char * const buf, int n) {
+static void _itox(int64_t x, char * const buf, int n) {
     const char hex[] = "0123456789abcdef";
 
     for(int i = 0; i < n; i++) {
