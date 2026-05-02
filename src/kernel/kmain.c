@@ -12,6 +12,8 @@
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
+#include "task/kthreads.h"
+#include "task/cpu_scheduler.h"
 
 static void command_info(void);
 static void command_ls(void);
@@ -19,6 +21,23 @@ static void command_cat(const char * command);
 static void command_exec(void);
 static void command_settimeout(const char * command);
 static void schedule_timeout(void *);
+
+void thread_entry() {
+    char a[40], b[40];
+    itoa(current_task->pid, a);
+
+    for (int i = 0; i < 5; i++) {
+        itoa(i, b);
+        
+        uart_puts_variadic("Thread id: ", a, " ", b, "\n", 0);
+
+        for (int j = 0; j < 100000000; j++);
+
+        cpu_scheduler_next();
+    }
+
+    kthread_exit();
+}
 
 /*
 TODO:
@@ -60,6 +79,15 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     interrupts_enable();
     interrupts_enable_external();
     interrupts_enable_timer();
+
+    // ===================
+    cpu_scheduler_init();
+
+    for (int i=0; i < 3; i++) {
+        kthread_create(thread_entry);
+    }
+
+    cpu_scheduler_idle();
 
     // ===================
     schedule_timeout(0);

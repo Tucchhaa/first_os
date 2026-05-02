@@ -21,7 +21,7 @@ struct cpio_newc_header {
     char c_check[8];
 };
 
-static inline uint8_t initrd_check_magic(uintptr_t file_addr) {
+inline uint8_t initrd_check_magic(uintptr_t file_addr) {
     return streqln((const char *)file_addr, "070701", 6);
 }
 
