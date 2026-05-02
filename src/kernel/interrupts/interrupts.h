@@ -7,6 +7,7 @@ struct process;
 void interrupts_setup();
 
 void interrupts_enable();
+void interrupts_restore(uint8_t pie);
 uint8_t interrupts_disable();
 
 void interrupts_enable_external();

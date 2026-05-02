@@ -12,24 +12,19 @@
 #include "../../string.h"
 #include "../../converters.h"
 
-static struct process * kernel_process;
-
 void _interrupts_entry();
 
 void interrupts_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
-    kernel_process = process_create(0, 0);
-
-    csr_sscratch_set((uintptr_t)kernel_process);
     csr_stvec_set((uintptr_t)_interrupts_entry);
-
     timeouts_setup();
 
     uart_sync_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
 
 void interrupts_enable() { csr_sstatus_enable(CSR_SSTATUS_SIE); }
+void interrupts_restore(uint8_t pie) { if (pie) csr_sstatus_enable(CSR_SSTATUS_SIE); }
 uint8_t interrupts_disable() { return csr_sstatus_rdisable(CSR_SSTATUS_SIE); }
 
 void interrupts_enable_external() { csr_sie_enable(CSR_SIE_SEIE); }

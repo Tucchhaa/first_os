@@ -8,7 +8,9 @@
 #include "../../converters.h"
 #include "../sbi.h"
 
-uint32_t cpu_frequency = 0;
+uint64_t cpu_frequency = 0;
+
+static uint32_t created_timeouts_count = 0;
 
 static struct linked_list timeout_queue;
 
@@ -17,6 +19,7 @@ struct timeout_entry {
     void (*callback)(void *);
     void * arg;
     uint64_t target_time;
+    uint32_t id;
 };
 
 static void _insert_to_timeouts_queue(struct timeout_entry *entry);
@@ -35,23 +38,50 @@ void timeouts_setup() {
     cpu_frequency = be32_to_cpu(*(uint32_t *)(&cpu_frequency_prop->data));
 }
 
-void set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) {
+void _set_next_timeout() {
+    if (timeout_queue.head != 0) {
+        struct timeout_entry * next = (struct timeout_entry *)timeout_queue.head;
+        sbi_set_timer(next->target_time);
+    } else {
+        sbi_set_timer(sbi_read_time() + cpu_frequency * 1000000);
+    }
+}
+
+uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) {
     struct timeout_entry * entry = allocate(sizeof(struct timeout_entry));
     entry->callback = callback;
     entry->arg = arg;
     entry->target_time = sbi_read_time() + (cpu_frequency / 1000) * timeout_ms;
+    entry->id = created_timeouts_count++;
 
-    uint8_t prev = interrupts_disable();
+    uint8_t pie = interrupts_disable();
 
     _insert_to_timeouts_queue(entry);   
+    _set_next_timeout();
 
-    if (timeout_queue.head == &entry->node) {
-        sbi_set_timer(entry->target_time);
+    interrupts_restore(pie);
+
+    return entry->id;
+}
+
+void clear_timeout(uint32_t timeout_id) {
+    uint8_t pie = interrupts_disable();
+
+    struct timeout_entry * current_entry = (struct timeout_entry *)timeout_queue.head;
+
+    while (current_entry) {
+        if (current_entry->id == timeout_id) {
+            linked_list_remove(&timeout_queue, &current_entry->node);
+            free(current_entry);
+            break;
+        }
+
+        current_entry = (struct timeout_entry *)current_entry->node.next;
     }
 
-    if (prev) {
-        interrupts_enable();
-    }
+    _set_next_timeout();
+
+    interrupts_restore(pie);
 }
 
 void timeouts_interrupt_handler() {
@@ -69,12 +99,7 @@ void timeouts_interrupt_handler() {
         free(timeout_entry);
     }
 
-    if (timeout_queue.head != 0) {
-        struct timeout_entry * next = (struct timeout_entry *)timeout_queue.head;
-        sbi_set_timer(next->target_time);
-    } else {
-        sbi_set_timer(sbi_read_time() + cpu_frequency * 10);
-    }
+    _set_next_timeout();
 }
 
 static void _insert_to_timeouts_queue(struct timeout_entry *entry) {

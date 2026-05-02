@@ -4,20 +4,26 @@
 
 _switch_to:
   # --- [SAVE CURRENT CPU STATE] ---
-  sd s0, 0(a0)
-  sd s1, 8(a0)
-  sd s2, 16(a0)
-  sd s3, 24(a0)
-  sd s4, 32(a0)
-  sd s5, 40(a0)
-  sd s6, 48(a0)
-  sd s7, 56(a0)
-  sd s8, 64(a0)
-  sd s9, 72(a0)
+  sd s0,  0(a0)
+  sd s1,  8(a0)
+  sd s2,  16(a0)
+  sd s3,  24(a0)
+  sd s4,  32(a0)
+  sd s5,  40(a0)
+  sd s6,  48(a0)
+  sd s7,  56(a0)
+  sd s8,  64(a0)
+  sd s9,  72(a0)
   sd s10, 80(a0)
   sd s11, 88(a0)
-  sd ra, 96(a0)
-  sd sp, 104(a0)
+  sd ra,  96(a0)
+  sd sp,  104(a0)
+
+  csrr t0, sscratch
+  sd   t0, 112(a0)
+
+  csrr t0, sstatus
+  sd   t0, 120(a0)
 
   # --- [RESTORE NEXT CPU STATE] ---
   ld s0, 0(a1)
@@ -34,6 +40,12 @@ _switch_to:
   ld s11, 88(a1)
   ld ra, 96(a1)
   ld sp, 104(a1)
+
+  ld t0, 112(a1)
+  csrw sscratch, t0
+
+  ld   t0, 120(a1)
+  csrw sstatus, t0
 
   # --- [EXECUTE NEXT THREAD] --
   mv tp, a1

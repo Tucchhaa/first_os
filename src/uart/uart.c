@@ -87,15 +87,13 @@ void uart_put(uint8_t b) {
         }
 
         // TODO: it's possible to disable interrupts per string, not per byte
-        uint8_t prev = interrupts_disable();
+        uint8_t pie = interrupts_disable();
 
         tx_ring[tx_head] = b;
         tx_head = next;
         *_uart_regs.ier |= UART_IER_THR_EMPTY;
 
-        if (prev) {
-            interrupts_enable();
-        }
+        interrupts_restore(pie);
 
         return;
     }

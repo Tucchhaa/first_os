@@ -12,6 +12,7 @@
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
 #include "mm/dynamic_allocator.h"
+#include "task/task.h"
 #include "task/kthreads.h"
 #include "task/cpu_scheduler.h"
 
@@ -76,7 +77,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     interrupts_setup();
     plic_setup();
     uart_setup();
-    interrupts_enable();
+    // interrupts_enable();
     interrupts_enable_external();
     interrupts_enable_timer();
 
