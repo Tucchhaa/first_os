@@ -6,21 +6,32 @@
 #include "csr.h"
 #include "plic.h"
 #include "timeouts.h"
-#include "../process/process.h"
+#include "syscalls.h"
+#include "interrupt_tasks.h"
+#include "../task/task.h"
+#include "../task/kthreads.h"
+#include "../task/cpu_scheduler.h"
 #include "../../uart/uart_sync.h"
 #include "../../uart/uart.h"
 #include "../../string.h"
 #include "../../converters.h"
 
-#include "../task/kthreads.h"
+static uint8_t _need_reschedule_cpu = 0;
+
+
+
+void set_need_reschedule_cpu(void *) { 
+    _need_reschedule_cpu = 1; 
+}
 
 void _interrupts_entry();
 
 void interrupts_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
-    csr_stvec_set((uintptr_t)_interrupts_entry);
+    interrupt_tasks_setup();
     timeouts_setup();
+    csr_stvec_set((uintptr_t)_interrupts_entry);
 
     uart_sync_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
@@ -35,52 +46,77 @@ void interrupts_disable_external() { csr_sie_disable(CSR_SIE_SEIE); }
 void interrupts_enable_timer() { csr_sie_enable(CSR_SIE_STIE); }
 void interrupts_disable_timer() { csr_sie_disable(CSR_SIE_STIE); }
 
-void _interrupts_external_handler();
+void _interrupts_external_handler(void * arg);
 
-void interrupts_handler(struct process * process) {
+static void _interrupts_get_handler(
+    void (**handler)(void *),
+    void ** arg,
+    uint8_t * priority,
+    struct trapframe * trapframe
+) {
     uint64_t scause = csr_scause_get();
 
     switch (scause)
     {
     case ((1ULL << 63) | 5): // is_timer
-        timeouts_interrupt_handler();
+        timeouts_postpone();
+        *priority = 1;
+        *arg = 0;
+        *handler = &timeouts_interrupt_handler;
         break;
     case ((1ULL << 63) | 9): // is_external
-        _interrupts_external_handler();
+        *priority = 1;
+        *arg = (void *)plic_claim();
+        *handler = &_interrupts_external_handler;
         break;
     default:
-        static int count = 0;
-        count ++;
-
-        register uint64_t stval;
-        asm volatile ("csrr %0, stval" : "=r" (stval));
-
-        char scause_buf[40];
-        char sepc_buf[40];
-        char stval_buf[40];
-
-        itoa(scause, scause_buf);
-        i32tox(process->sepc, sepc_buf);
-        itoa(stval, stval_buf);
-
-        uart_puts("=== S-Mode trap ===\n");
-        uart_puts_variadic("scause: ", scause_buf, "\n", 0);
-        uart_puts_variadic("sepc: ", sepc_buf, "\n", 0);
-        uart_puts_variadic("stval: ", stval_buf, "\n", 0);
-
-        // skip the ecall instruction
-        process->sepc += 4;
-
-        if (count == 5) {
-            kthread_exit();
-        } 
-
+        *priority = 1;
+        *arg = trapframe;
+        *handler = &syscall_handler;
         break;
     }
 }
 
-void _interrupts_external_handler() {
-    uint32_t irq = plic_claim();
+void interrupts_handler(struct trapframe * trapframe) {
+    static uint8_t is_tasks_executing = 0;
+
+    void (*handler)(void *);
+    uint8_t priority;
+    void * arg;
+    _interrupts_get_handler(&handler, &arg, &priority, trapframe);
+
+    interrupt_tasks_add(handler, arg, priority);
+
+    if (is_tasks_executing) {
+        return;
+    }
+
+    is_tasks_executing = 1;
+
+    struct trapframe nested_trapframe;
+    trapframe_init(&nested_trapframe);
+    nested_trapframe.sstatus = CSR_SSTATUS_SPIE | CSR_SSTATUS_SPP;
+    csr_sscratch_set((uintptr_t)&nested_trapframe);
+
+    interrupts_enable();
+
+    while (!interrupt_tasks_is_empty()) {
+        interrupt_tasks_execute();
+    }
+
+    interrupts_disable();
+    csr_sscratch_set((uintptr_t)trapframe);
+
+    is_tasks_executing = 0;
+
+    if (_need_reschedule_cpu) {
+        _need_reschedule_cpu = 0;
+        cpu_scheduler_next();
+    }
+}
+
+void _interrupts_external_handler(void * arg) {
+    uint32_t irq = (uint32_t)arg;
 
     if (irq == uart_irq) {
         uart_irq_handler();

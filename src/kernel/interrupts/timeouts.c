@@ -24,12 +24,16 @@ struct timeout_entry {
 
 static void _insert_to_timeouts_queue(struct timeout_entry *entry);
 
+void timeouts_postpone() {
+    sbi_set_timer(sbi_read_time() + cpu_frequency * 1000000);
+}
+
 static void _set_next_timeout() {
     if (timeout_queue.head != 0) {
         struct timeout_entry * next = (struct timeout_entry *)timeout_queue.head;
         sbi_set_timer(next->target_time);
     } else {
-        sbi_set_timer(sbi_read_time() + cpu_frequency * 1000000);
+        timeouts_postpone();
     }
 }
 
@@ -58,7 +62,7 @@ uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) 
 
     uint8_t pie = interrupts_disable();
 
-    _insert_to_timeouts_queue(entry);   
+    _insert_to_timeouts_queue(entry); 
     _set_next_timeout();
 
     interrupts_restore(pie);
@@ -86,7 +90,7 @@ void clear_timeout(uint32_t timeout_id) {
     interrupts_restore(pie);
 }
 
-void timeouts_interrupt_handler() {
+void timeouts_interrupt_handler(void *) {
     uint64_t now = sbi_read_time();
 
     while (timeout_queue.head != 0) {
@@ -104,27 +108,17 @@ void timeouts_interrupt_handler() {
     _set_next_timeout();
 }
 
-static void _insert_to_timeouts_queue(struct timeout_entry *entry) {
-    struct linked_list_node *current = timeout_queue.head;
+static void _insert_to_timeouts_queue(struct timeout_entry * new_entry) {
+    struct timeout_entry * current_entry = (struct timeout_entry *)timeout_queue.head;
 
-    while (current != 0) {
-        struct timeout_entry *current_entry = (struct timeout_entry *)current;
-
-        if (entry->target_time < current_entry->target_time) {
-            entry->node.next = current;
-            entry->node.prev = current->prev;
-
-            if (current->prev != 0) {
-                current->prev->next = &entry->node;
-            } else {
-                timeout_queue.head = &entry->node;
-            }
-            current->prev = &entry->node;
+    while (current_entry != 0) {
+        if (new_entry->target_time < current_entry->target_time) {
+            linked_list_insert_before(&timeout_queue, &new_entry->node, &current_entry->node);
             return;
         }
 
-        current = current->next;
+        current_entry = (struct timeout_entry *)current_entry->node.next;
     }
 
-    linked_list_insert(&timeout_queue, &entry->node);
+    linked_list_insert(&timeout_queue, &new_entry->node);
 }

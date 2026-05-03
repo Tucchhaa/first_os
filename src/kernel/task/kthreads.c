@@ -7,9 +7,9 @@
 
 #define KERNEL_STACK_SIZE 4096
 
-static uint32_t created_task_count = 0;
-
 struct task * kthread_create(void (*entry_point)(void), void * arg) {
+    static uint32_t created_task_count = 0;
+
     struct task * task = allocate(sizeof(struct task));
 
     task->pid = created_task_count++;
@@ -23,11 +23,8 @@ struct task * kthread_create(void (*entry_point)(void), void * arg) {
     task->kernel_sp -= sizeof(struct trapframe);
     struct trapframe * trapframe = (struct trapframe *)task->kernel_sp;
 
-    for (uint32_t i=0; i < 32; i++) {
-        trapframe->regs[i] = 0;
-    }
-    trapframe->sepc = 0;
-    trapframe->sstatus = CSR_SSTATUS_SPIE;
+    trapframe_init(trapframe);
+    trapframe->sstatus = CSR_SSTATUS_SPIE | CSR_SSTATUS_SPP;
 
     task->thread.sscratch = (uint64_t)trapframe;
 
@@ -45,10 +42,11 @@ struct task * kthread_create(void (*entry_point)(void), void * arg) {
 }
 
 void kthread_sret() {
-    uint64_t entry_point = (uint64_t)current_task->arg;
+    struct task * current_task = get_current_task();
     struct trapframe * trapframe = (struct trapframe *)current_task->thread.sscratch;
-    trapframe->sepc = entry_point;
+    trapframe->sepc = (uint64_t)current_task->arg;
 
+    // todo: set correct trapframe.sstatus
     csr_sstatus_set(trapframe->sstatus);
     csr_sepc_set(trapframe->sepc);
 

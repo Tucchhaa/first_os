@@ -2,7 +2,9 @@
 
 #include <stdint.h>
 
-struct process;
+struct trapframe;
+
+void set_need_reschedule_cpu(void *);
 
 void interrupts_setup();
 
@@ -16,4 +18,4 @@ void interrupts_disable_external();
 void interrupts_enable_timer();
 void interrupts_disable_timer();
 
-void interrupts_handler(struct process * process);
+void interrupts_handler(struct trapframe * trapframe);

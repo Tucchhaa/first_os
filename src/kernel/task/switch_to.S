@@ -41,6 +41,8 @@ _switch_to:
   ld ra, 96(a1)
   ld sp, 104(a1)
 
+  mv tp, a1
+
   ld t0, 112(a1)
   csrw sscratch, t0
 
@@ -48,5 +50,4 @@ _switch_to:
   csrw sstatus, t0
 
   # --- [EXECUTE NEXT THREAD] --
-  mv tp, a1
   ret

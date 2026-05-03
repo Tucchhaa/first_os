@@ -2,7 +2,7 @@
 
 #include "../ds/linked_list.h"
 
-extern struct task * current_task;
+struct task;
 
 void cpu_scheduler_init();
 

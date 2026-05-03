@@ -24,6 +24,23 @@ void linked_list_insert(struct linked_list * list, struct linked_list_node * nod
     list->tail = node;
 }
 
+void linked_list_insert_before(
+    struct linked_list * list, 
+    struct linked_list_node * node,
+    struct linked_list_node * before_node
+) {
+    node->next = before_node;
+    node->prev = before_node->prev;
+
+    if (before_node->prev != 0) {
+        before_node->prev->next = node;
+    } else {
+        list->head = node;
+    }
+
+    before_node->prev = node;
+}
+
 void linked_list_remove(struct linked_list * list, struct linked_list_node * node) {
     if (node->next == 0) {
         list->tail = node->prev;

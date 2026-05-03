@@ -6,23 +6,21 @@
 #include "task.h"
 #include "../mm/dynamic_allocator.h"
 #include "../interrupts/timeouts.h"
+#include "../interrupts/interrupts.h"
 
 static struct linked_list ready_queue;
 static struct linked_list waiting_queue;
 static struct linked_list killed_queue;
 
-static struct task * idle_task;
-
 static struct task bootstrap;
-struct task * current_task;
 
-static const uint32_t timeout_ms = 100;
+static const uint32_t time_quantum = 200;
 static uint32_t timeout_id;
 
 extern void _switch_to(struct task * prev, struct task * next);
 
-static void _cpu_scheduler_next_tick(void * arg) {
-    cpu_scheduler_next();
+static inline void set_current_task(struct task * task) {
+    asm volatile ("mv tp, %0" :: "r"(task) :);
 }
 
 void cpu_scheduler_init() {
@@ -31,7 +29,7 @@ void cpu_scheduler_init() {
     linked_list_init(&killed_queue);
 
     bootstrap.is_killed = 1;
-    current_task = &bootstrap;
+    set_current_task(&bootstrap);
 }
 
 static struct task * _get_task_from_node(struct linked_list_node * node) {
@@ -45,7 +43,9 @@ void cpu_scheduler_add_task(struct task * task) {
 }
 
 void cpu_scheduler_kill() {
+    struct task * current_task = get_current_task();
     current_task->is_killed = 1;
+
     linked_list_insert(&killed_queue, &current_task->node);
 
     if (ready_queue.head == 0) {
@@ -63,9 +63,9 @@ void cpu_scheduler_next() {
     }
 
     clear_timeout(timeout_id);
-    timeout_id = set_timeout(_cpu_scheduler_next_tick, 0, timeout_ms);
+    timeout_id = set_timeout(set_need_reschedule_cpu, 0, time_quantum);
 
-    struct task * prev = current_task;
+    struct task * prev = get_current_task();
     struct task * next = _get_task_from_node(ready_queue.head);
 
     if (prev->is_killed == 0) {
@@ -74,13 +74,11 @@ void cpu_scheduler_next() {
 
     linked_list_remove(&ready_queue, &next->node);
 
-    current_task = next;
-
     _switch_to(prev, next);
 }
 
 void cpu_scheduler_idle() {
-    timeout_id = set_timeout(_cpu_scheduler_next_tick, 0, timeout_ms);
+    timeout_id = set_timeout(set_need_reschedule_cpu, 0, time_quantum);
 
     while (1) {
         while (1) {

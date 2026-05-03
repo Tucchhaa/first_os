@@ -77,6 +77,12 @@ uint8_t uart_get() {
     return c;
 }
 
+void uart_get_bytes(uint8_t * buf, int n) {
+    for(int i=0; i < n; i++) {
+        buf[i] = uart_get();
+    }
+}
+
 void uart_put(uint8_t b) {
     while (1) {
         uint32_t next = (tx_head + 1) % TX_RING_SIZE;

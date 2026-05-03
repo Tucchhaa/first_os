@@ -31,3 +31,11 @@ struct trapframe {
     uint64_t sepc;
     uint64_t sstatus;
 };
+
+static inline struct task * get_current_task() {
+    struct task * result;
+    asm volatile ("mv %0, tp" : "=r" (result) ::);
+    return result;
+}
+
+void trapframe_init(struct trapframe * trapframe);

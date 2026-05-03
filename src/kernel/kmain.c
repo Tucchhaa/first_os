@@ -7,7 +7,6 @@
 #include "interrupts/plic.h"
 #include "interrupts/interrupts.h"
 #include "interrupts/timeouts.h"
-#include "process/process.h"
 #include "initrd/initrd.h"
 #include "mm/setup.h"
 #include "mm/page_allocator.h"
@@ -25,7 +24,7 @@ static void schedule_timeout(void *);
 
 void thread_entry() {
     char a[40], b[40];
-    itoa(current_task->pid, a);
+    itoa(get_current_task()->pid, a);
 
     for (int i = 0; i < 5; i++) {
         itoa(i, b);
@@ -34,6 +33,7 @@ void thread_entry() {
 
         for (int j = 0; j < 100000000; j++);
 
+        uart_puts("next\n");
         cpu_scheduler_next();
     }
 
@@ -45,7 +45,6 @@ TODO:
 - support multiple memory regions
 - clean up the kmain.c
 - optimize page allocator
-- use single linked list
 - implement self relocating bootloader
 - implement nested interrupts
 - when sret to user process: 1) clean all registers 2) use user stack
