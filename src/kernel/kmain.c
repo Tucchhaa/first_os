@@ -48,6 +48,7 @@ TODO:
 - use single linked list
 - implement self relocating bootloader
 - implement nested interrupts
+- when sret to user process: 1) clean all registers 2) use user stack
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {
@@ -85,8 +86,10 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     cpu_scheduler_init();
 
     for (int i=0; i < 3; i++) {
-        kthread_create(thread_entry);
+        kthread_create(thread_entry, 0);
     }
+
+    // command_exec();
 
     cpu_scheduler_idle();
 
@@ -250,9 +253,14 @@ static void command_exec(void) {
         proc_addr[i] = ((char *)file_data)[i];
     }
 
-    struct process * user_process = process_create((uintptr_t)proc_addr, 1);
+    char a[40];
+    i64tox((uintptr_t)proc_addr, a);
+    uart_sync_puts_variadic("proc_addr: ", a, "\n", 0);
 
-    process_switch(user_process);
+    kthread_create(kthread_sret, proc_addr);
+    // struct process * user_process = process_create((uintptr_t)proc_addr, 1);
+
+    // process_switch(user_process);
 }
 
 static void timeout_func(void * arg) {

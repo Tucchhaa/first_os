@@ -12,6 +12,8 @@
 #include "../../string.h"
 #include "../../converters.h"
 
+#include "../task/kthreads.h"
+
 void _interrupts_entry();
 
 void interrupts_setup() {
@@ -47,6 +49,9 @@ void interrupts_handler(struct process * process) {
         _interrupts_external_handler();
         break;
     default:
+        static int count = 0;
+        count ++;
+
         register uint64_t stval;
         asm volatile ("csrr %0, stval" : "=r" (stval));
 
@@ -65,6 +70,11 @@ void interrupts_handler(struct process * process) {
 
         // skip the ecall instruction
         process->sepc += 4;
+
+        if (count == 5) {
+            kthread_exit();
+        } 
+
         break;
     }
 }

@@ -24,6 +24,15 @@ struct timeout_entry {
 
 static void _insert_to_timeouts_queue(struct timeout_entry *entry);
 
+static void _set_next_timeout() {
+    if (timeout_queue.head != 0) {
+        struct timeout_entry * next = (struct timeout_entry *)timeout_queue.head;
+        sbi_set_timer(next->target_time);
+    } else {
+        sbi_set_timer(sbi_read_time() + cpu_frequency * 1000000);
+    }
+}
+
 void timeouts_setup() {
     linked_list_init(&timeout_queue);
 
@@ -36,15 +45,8 @@ void timeouts_setup() {
     }
 
     cpu_frequency = be32_to_cpu(*(uint32_t *)(&cpu_frequency_prop->data));
-}
 
-void _set_next_timeout() {
-    if (timeout_queue.head != 0) {
-        struct timeout_entry * next = (struct timeout_entry *)timeout_queue.head;
-        sbi_set_timer(next->target_time);
-    } else {
-        sbi_set_timer(sbi_read_time() + cpu_frequency * 1000000);
-    }
+    _set_next_timeout();
 }
 
 uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) {
