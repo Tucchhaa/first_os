@@ -46,7 +46,7 @@ TODO:
 - clean up the kmain.c
 - optimize page allocator
 - implement self relocating bootloader
-- implement nested interrupts
+- support interrupt task preemption
 - when sret to user process: 1) clean all registers 2) use user stack
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
@@ -84,13 +84,14 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     // ===================
     cpu_scheduler_init();
 
-    for (int i=0; i < 3; i++) {
-        kthread_create(thread_entry, 0);
-    }
+    // for (int i=0; i < 3; i++) {
+    //     kthread_create(thread_entry, 0);
+    // }
 
-    // command_exec();
+    command_exec();
 
-    cpu_scheduler_idle();
+    // cpu_scheduler_idle();
+    cpu_scheduler_next();
 
     // ===================
     schedule_timeout(0);
@@ -236,7 +237,8 @@ static void command_cat(const char * command) {
 }
 
 static void command_exec(void) {
-    uintptr_t file_addr = initrd_get_file_addr("./prog.bin");
+    uintptr_t file_addr = initrd_get_file_addr("./osctest.bin");
+    // uintptr_t file_addr = initrd_get_file_addr("./prog.bin");
 
     if (file_addr == 0) {
         uart_puts("Could not find user program\n");
@@ -246,7 +248,7 @@ static void command_exec(void) {
     uint32_t data_size;
     uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
 
-    char * proc_addr = allocate(4096);
+    char * proc_addr = allocate(data_size);
 
     for (uintptr_t i = 0; i < data_size; i += 1) {
         proc_addr[i] = ((char *)file_data)[i];

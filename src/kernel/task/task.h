@@ -4,6 +4,27 @@
 
 #include "../ds/linked_list.h"
 
+// #define WAIT_PROCESS_KILL 1
+// #define WAIT_UART_READ 2
+// #define WAIT_UART_WRITE 3
+
+union task_wait_event_arg {
+    uint32_t i;
+};
+
+enum task_wait_event_id {
+    WAIT_PROCESS_KILL,
+    WAIT_UART_READ,
+    WAIT_UART_WRITE
+};
+
+enum task_state {
+    TASK_READY,
+    TASK_RUNNING,
+    TASK_WAITING,
+    TASK_KILLED
+};
+
 struct task {
     struct thread {
         uint64_t s[12];
@@ -13,8 +34,6 @@ struct task {
         uint64_t sstatus;
     } thread;
 
-    uint8_t is_umode;
-
     struct linked_list_node node;
 
     uint32_t pid;
@@ -22,7 +41,13 @@ struct task {
     uintptr_t kernel_stack_addr;
     uintptr_t user_sp;
     uintptr_t user_stack_addr;
-    uint8_t is_killed;
+    enum task_state state;
+    
+    struct wait_event {
+        enum task_wait_event_id id;
+        union task_wait_event_arg arg;
+    } wait_event;
+
     void * arg;
 };
 
@@ -37,5 +62,9 @@ static inline struct task * get_current_task() {
     asm volatile ("mv %0, tp" : "=r" (result) ::);
     return result;
 }
+
+struct task * task_allocate();
+
+struct task * task_copy(struct task * source);
 
 void trapframe_init(struct trapframe * trapframe);

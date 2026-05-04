@@ -6,8 +6,10 @@
 #include "../fdt/fdt.h"
 #include "../converters.h"
 #include "../string.h"
+#include "../kernel/task/task.h"
 #include "../kernel/interrupts/plic.h"
 #include "../kernel/interrupts/interrupts.h"
+#include "../kernel/task/cpu_scheduler.h"
 
 #define RX_RING_SIZE 512
 #define TX_RING_SIZE 512
@@ -43,7 +45,12 @@ void uart_setup() {
 }
 
 void uart_irq_handler() {
+    uint8_t has_received = 0;
+    uint8_t has_transmitted = 0;
+
     while (uart_status_dr(&_uart_regs)) {
+        has_received = 1;
+
         uint8_t c = *_uart_regs.base;
         uint32_t next = (rx_head + 1) % RX_RING_SIZE;
 
@@ -54,7 +61,13 @@ void uart_irq_handler() {
         // Overflow: drop byte.
     }
 
+    if (has_received) {
+        cpu_scheduler_fire(WAIT_UART_READ);
+    }
+    
     while (uart_status_thre(&_uart_regs)) {
+        has_transmitted = 1;
+
         if (tx_head == tx_tail) {
             // Ring drained: stop asking for THR-empty interrupts.
             *_uart_regs.ier &= ~UART_IER_THR_EMPTY;
@@ -64,11 +77,15 @@ void uart_irq_handler() {
         *_uart_regs.base = tx_ring[tx_tail];
         tx_tail = (tx_tail + 1) % TX_RING_SIZE;
     }
+
+    if (has_transmitted) {
+        cpu_scheduler_fire(WAIT_UART_WRITE);
+    }
 }
 
 uint8_t uart_get() {
     while (rx_head == rx_tail) {
-        asm volatile("wfi");
+        asm volatile ("wfi");
     }
 
     uint8_t c = rx_ring[rx_tail];
@@ -77,10 +94,23 @@ uint8_t uart_get() {
     return c;
 }
 
-void uart_get_bytes(uint8_t * buf, int n) {
-    for(int i=0; i < n; i++) {
-        buf[i] = uart_get();
+uint8_t uart_receive_buf_empty() {
+    return rx_head == rx_tail;
+}
+
+uint8_t uart_transmit_buf_full() {
+    return (tx_head + 1) % TX_RING_SIZE == tx_tail;
+}
+
+uint32_t uart_get_bytes(uint8_t * buf, uint32_t n) {
+    uint32_t i = 0;
+
+    for(; i < n && !uart_receive_buf_empty(); i++) {
+        buf[i] = rx_ring[rx_tail];
+        rx_tail = (rx_tail + 1) % RX_RING_SIZE;
     }
+
+    return i;
 }
 
 void uart_put(uint8_t b) {
@@ -105,8 +135,33 @@ void uart_put(uint8_t b) {
     }
 }
 
+void _uart_put(uint8_t b) {
+    if (uart_transmit_buf_full()) {
+        return;
+    }
+
+    uint8_t pie = interrupts_disable();
+
+    tx_ring[tx_head] = b;
+    tx_head = (tx_head + 1) % TX_RING_SIZE;
+    *_uart_regs.ier |= UART_IER_THR_EMPTY;
+
+    interrupts_restore(pie);
+}
+
+uint32_t uart_put_bytes(const char * buf, uint32_t count) {
+    uint32_t i = 0;
+
+    for (; i < count && !uart_transmit_buf_full(); i++) {
+        if (buf[i] == '\n') _uart_put('\r');
+        _uart_put(buf[i]);
+    }
+
+    return i;
+}
+
 void uart_puts(const char * str) {
-    for (int i = 0; str[i] != '\0'; i++) {
+    for (uint32_t i = 0; str[i] != '\0'; i++) {
         if (str[i] == '\n') uart_put('\r');
         uart_put(str[i]);
     }
@@ -126,9 +181,8 @@ void uart_puts_variadic(const char * first, ...) {
     va_end(args);
 }
 
-
-void uart_getline(char * buf, int n) {
-    int i = 0;
+uint32_t uart_getline(char * buf, uint32_t n) {
+    uint32_t i = 0;
 
     while (i < n - 1) {
         char c = (char)uart_get();
@@ -144,4 +198,5 @@ void uart_getline(char * buf, int n) {
     }
 
     buf[i] = '\0';
+    return i + 1;
 }

@@ -18,8 +18,6 @@
 
 static uint8_t _need_reschedule_cpu = 0;
 
-
-
 void set_need_reschedule_cpu(void *) { 
     _need_reschedule_cpu = 1; 
 }
