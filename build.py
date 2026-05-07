@@ -202,7 +202,8 @@ class Kernel(Project):
             "src/kernel/interrupts/plic.c",
             "src/kernel/interrupts/timeouts.c",
             "src/kernel/task/task.c",
-            "src/kernel/task/switch_to.S",
+            "src/kernel/task/switch_to_kernel.S",
+            "src/kernel/task/switch_to_user.S",
             "src/kernel/task/kthreads.c",
             "src/kernel/task/cpu_scheduler.c",
         ]

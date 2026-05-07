@@ -8,6 +8,6 @@ struct task;
 
 struct task * kthread_create(void (*entry_point)(void), void * arg);
 
-void kthread_sret();
+void kthread_exec_user();
 
 void kthread_exit();

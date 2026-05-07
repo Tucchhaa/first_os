@@ -4,25 +4,22 @@
 
 #include "../ds/linked_list.h"
 
-// #define WAIT_PROCESS_KILL 1
-// #define WAIT_UART_READ 2
-// #define WAIT_UART_WRITE 3
-
 union task_wait_event_arg {
     uint32_t i;
 };
 
 enum task_wait_event_id {
-    WAIT_PROCESS_KILL,
-    WAIT_UART_READ,
-    WAIT_UART_WRITE
+    TASK_WAIT_NONE,
+    TASK_WAIT_PROCESS_KILL,
+    TASK_WAIT_UART_READ,
+    TASK_WAIT_UART_WRITE
 };
 
 enum task_state {
-    TASK_READY,
-    TASK_RUNNING,
-    TASK_WAITING,
-    TASK_KILLED
+    TASK_STATE_READY,
+    TASK_STATE_RUNNING,
+    TASK_STATE_WAITING,
+    TASK_STATE_KILLED
 };
 
 struct task {
@@ -66,5 +63,3 @@ static inline struct task * get_current_task() {
 struct task * task_allocate();
 
 struct task * task_copy(struct task * source);
-
-void trapframe_init(struct trapframe * trapframe);

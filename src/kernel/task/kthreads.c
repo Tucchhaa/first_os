@@ -7,32 +7,35 @@
 
 #include "../../uart/uart.h"
 
-#define KERNEL_STACK_SIZE 16384
+extern void _switch_to_user();
 
 struct task * kthread_create(void (*entry_point)(void), void * arg) {
     struct task * task = task_allocate();
+    task->state = TASK_STATE_READY;
+    task->wait_event.id = TASK_WAIT_NONE;
     task->thread.ra = (uint64_t)entry_point;
+    // status.spp actaully is not needed here, because kthread is never sret'ed
     task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
     task->arg = arg;
-
-    struct trapframe * trapframe = (struct trapframe *)task->thread.sscratch;
-    trapframe->sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
 
     cpu_scheduler_add_task(task);
 
     return task;
 }
 
-void kthread_sret() {
+void kthread_exec_user() {
     struct task * current_task = get_current_task();
     struct trapframe * trapframe = (struct trapframe *)current_task->thread.sscratch;
     trapframe->sepc = (uint64_t)current_task->arg;
-    trapframe->sstatus = CSR_SSTATUS_SIE;
+    trapframe->sstatus = CSR_SSTATUS_SPIE;
+    trapframe->regs[2] = current_task->kernel_sp; // set sp reg
+    // TODO: user process should not have access to struct task
+    trapframe->regs[4] = (uint64_t)current_task; // set tp reg
+    // TODO: set ra reg, to make exit syscall
 
-    csr_sstatus_set(trapframe->sstatus);
-    csr_sepc_set(trapframe->sepc);
+    csr_sscratch_set((uintptr_t)trapframe);
 
-    csr_sret();
+    _switch_to_user();
 }
 
 void kthread_exit() {

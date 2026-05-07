@@ -9,12 +9,9 @@
 #include "syscalls.h"
 #include "interrupt_tasks.h"
 #include "../task/task.h"
-#include "../task/kthreads.h"
 #include "../task/cpu_scheduler.h"
 #include "../../uart/uart_sync.h"
 #include "../../uart/uart.h"
-#include "../../string.h"
-#include "../../converters.h"
 
 static uint8_t _need_reschedule_cpu = 0;
 
@@ -63,6 +60,7 @@ static void _interrupts_get_handler(
         *handler = &timeouts_interrupt_handler;
         break;
     case ((1ULL << 63) | 9): // is_external
+        // uart_puts("external\n");
         *priority = 1;
         *arg = (void *)plic_claim();
         *handler = &_interrupts_external_handler;
@@ -92,19 +90,13 @@ void interrupts_handler(struct trapframe * trapframe) {
     is_tasks_executing = 1;
 
     struct trapframe nested_trapframe;
-    trapframe_init(&nested_trapframe);
-    nested_trapframe.sstatus = CSR_SSTATUS_SPIE | CSR_SSTATUS_SPP;
     csr_sscratch_set((uintptr_t)&nested_trapframe);
 
     interrupts_enable();
-
-    while (!interrupt_tasks_is_empty()) {
-        interrupt_tasks_execute();
-    }
-
+    while (interrupt_tasks_execute()) { }
     interrupts_disable();
-    csr_sscratch_set((uintptr_t)trapframe);
 
+    csr_sscratch_set((uintptr_t)trapframe);
     is_tasks_executing = 0;
 
     if (_need_reschedule_cpu) {

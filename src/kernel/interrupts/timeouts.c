@@ -58,7 +58,7 @@ uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) 
     entry->callback = callback;
     entry->arg = arg;
     entry->target_time = sbi_read_time() + (cpu_frequency / 1000) * timeout_ms;
-    entry->id = created_timeouts_count++;
+    entry->id = ++created_timeouts_count;
 
     uint8_t pie = interrupts_disable();
 

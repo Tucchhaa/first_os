@@ -5,8 +5,11 @@
 #include "../mm/dynamic_allocator.h"
 #include "../../uart/uart.h"
 #include "interrupts.h"
+#include "../task/kthreads.h"
 
 #include "../../converters.h"
+
+extern void _switch_to_user();
 
 static inline uint64_t _get_syscall_id(struct trapframe * tf) {
     return tf->regs[17];
@@ -30,7 +33,7 @@ void _syscall_uart_read(struct trapframe * tf) {
 
     if (uart_receive_buf_empty()) {
         tf->sepc -= 4;
-        cpu_scheduler_wait(WAIT_UART_READ);
+        cpu_scheduler_wait(TASK_WAIT_UART_READ);
         set_need_reschedule_cpu(0);
         return;
     }
@@ -45,11 +48,11 @@ void _syscall_uart_write(struct trapframe * tf) {
 
     if (uart_transmit_buf_full()) {
         tf->sepc -= 4;
-        cpu_scheduler_wait(WAIT_UART_WRITE);
+        cpu_scheduler_wait(TASK_WAIT_UART_WRITE);
         set_need_reschedule_cpu(0);
         return;
     }
-    
+
     uint32_t write_count = uart_put_bytes(buf, count);
     _syscall_set_result(tf, write_count);
 }
@@ -61,11 +64,12 @@ void _syscall_exec(struct trapframe * tf) {
 void _syscall_fork(struct trapframe * tf) {
     struct task * current_task = get_current_task();
     struct task * child_task = task_copy(current_task);
+    child_task->thread.ra = (uint64_t)_switch_to_user;
 
-    cpu_scheduler_add_task(child_task);
-    
     struct trapframe * child_tf = (struct trapframe *)child_task->thread.sscratch;
     child_tf->regs[10] = 0;
+    
+    cpu_scheduler_add_task(child_task);
 
     _syscall_set_result(tf, child_task->pid);
 }
@@ -76,7 +80,7 @@ void _syscall_waitpid(struct trapframe * tf) {
     uint32_t pid = (uint32_t)_get_param_by_index(tf, 0);
     
     union task_wait_event_arg arg = { .i = pid };
-    cpu_scheduler_wait_arg(WAIT_PROCESS_KILL, arg);
+    cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
     set_need_reschedule_cpu(0);
 
     _syscall_set_result(tf, pid);

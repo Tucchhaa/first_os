@@ -8,30 +8,36 @@
 #include "../interrupts/timeouts.h"
 #include "../interrupts/interrupts.h"
 
+#include "../../uart/uart.h"
+#include "../../converters.h"
+
 static struct linked_list ready_queue;
 static struct linked_list waiting_queue;
 static struct linked_list killed_queue;
 
 static struct task bootstrap;
+static struct task * idle_task;
 
 static const uint32_t time_quantum = 200;
 static uint32_t timeout_id;
 
-extern void _switch_to(struct task * prev, struct task * next);
+extern void _switch_to_kernel(struct task * prev, struct task * next);
 
 static inline void set_current_task(struct task * task) {
     asm volatile ("mv tp, %0" :: "r"(task) :);
 }
+
+void cpu_scheduler_idle();
 
 void cpu_scheduler_init() {
     linked_list_init(&ready_queue);
     linked_list_init(&waiting_queue);
     linked_list_init(&killed_queue);
 
-    kthread_create(cpu_scheduler_idle, 0);
-
-    bootstrap.state = TASK_KILLED;
+    bootstrap.state = TASK_STATE_KILLED;
     set_current_task(&bootstrap);
+
+    idle_task = kthread_create(cpu_scheduler_idle, 0);
 }
 
 static struct task * _get_task_from_node(struct linked_list_node * node) {
@@ -45,6 +51,7 @@ static struct task * _get_task_from_node(struct linked_list_node * node) {
 }
 
 void cpu_scheduler_add_task(struct task * task) {
+    task->state = TASK_STATE_READY;
     linked_list_insert(&ready_queue, &task->node);
 }
 
@@ -55,12 +62,12 @@ uint8_t _task_pid_matches(struct task * task, void * arg) {
 
 void cpu_scheduler_kill() {
     struct task * current_task = get_current_task();
-    current_task->state = TASK_KILLED;
 
+    current_task->state = TASK_STATE_KILLED;
     linked_list_insert(&killed_queue, &current_task->node);
 
     cpu_scheduler_fire_cond(
-        WAIT_PROCESS_KILL, _task_pid_matches, &current_task->pid
+        TASK_WAIT_PROCESS_KILL, _task_pid_matches, &current_task->pid
     );
 }
 
@@ -73,7 +80,7 @@ void cpu_scheduler_wait_arg(uint32_t event_id, union task_wait_event_arg arg) {
     struct task * current_task = get_current_task();
     current_task->wait_event.id = event_id;
     current_task->wait_event.arg = arg;
-    current_task->state = TASK_WAITING;
+    current_task->state = TASK_STATE_WAITING;
 
     linked_list_insert(&waiting_queue, &current_task->node);
 }
@@ -98,7 +105,7 @@ void cpu_scheduler_fire_cond(
             uint8_t condition = cond == 0 || cond(task, arg);
 
             if (condition) {
-                task->state = TASK_READY;
+                task->state = TASK_STATE_READY;
                 linked_list_remove(&waiting_queue, &task->node);
                 linked_list_insert(&ready_queue, &task->node);
             }
@@ -119,21 +126,19 @@ void cpu_scheduler_next() {
     struct task * prev = get_current_task();
     struct task * next = _get_task_from_node(ready_queue.head);
 
-    if (prev->state == TASK_RUNNING) {
-        prev->state = TASK_READY;
+    if (prev->state == TASK_STATE_RUNNING) {
+        prev->state = TASK_STATE_READY;
         linked_list_insert(&ready_queue, &prev->node);
     }
 
-    next->state = TASK_RUNNING;
+    next->state = TASK_STATE_RUNNING;
     linked_list_remove(&ready_queue, &next->node);
 
-    _switch_to(prev, next);
+    _switch_to_kernel(prev, next);
 }
 
 // TODO: if there is always some task, killed tasks will never be freed
 void cpu_scheduler_idle() {
-    timeout_id = set_timeout(set_need_reschedule_cpu, 0, time_quantum);
-
     while (1) {
         while (1) {
             struct linked_list_node * node = killed_queue.head;

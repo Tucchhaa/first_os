@@ -21,14 +21,6 @@ void interrupt_tasks_setup() {
     linked_list_init(&tasks_queue);
 }
 
-uint8_t interrupt_tasks_is_empty() {
-    uint8_t pie = interrupts_disable();
-    uint8_t result = tasks_queue.head == (void *)0;
-    interrupts_restore(pie);
-
-    return result;
-}
-
 void interrupt_tasks_add(
     void (*handler)(void *), 
     void * arg, 
@@ -59,8 +51,13 @@ void interrupt_tasks_add(
     interrupts_restore(pie);
 }
 
-void interrupt_tasks_execute() {
+uint8_t interrupt_tasks_execute() {
     uint8_t pie = interrupts_disable();
+
+    if (tasks_queue.head == (void *)0) {
+        interrupts_restore(pie);
+        return 0;
+    }
 
     struct interrupt_task * task = (struct interrupt_task *)tasks_queue.head;
 
@@ -68,4 +65,6 @@ void interrupt_tasks_execute() {
     interrupts_restore(pie);
 
     task->handler(task->arg);
+    
+    return 1;
 }

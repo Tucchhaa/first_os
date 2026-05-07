@@ -90,8 +90,7 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
 
     command_exec();
 
-    // cpu_scheduler_idle();
-    cpu_scheduler_next();
+    cpu_scheduler_idle();
 
     // ===================
     schedule_timeout(0);
@@ -258,10 +257,7 @@ static void command_exec(void) {
     i64tox((uintptr_t)proc_addr, a);
     uart_sync_puts_variadic("proc_addr: ", a, "\n", 0);
 
-    kthread_create(kthread_sret, proc_addr);
-    // struct process * user_process = process_create((uintptr_t)proc_addr, 1);
-
-    // process_switch(user_process);
+    kthread_create(kthread_exec_user, proc_addr);
 }
 
 static void timeout_func(void * arg) {

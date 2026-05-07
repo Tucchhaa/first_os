@@ -46,15 +46,13 @@ void uart_setup() {
 
 void uart_irq_handler() {
     uint8_t has_received = 0;
-    uint8_t has_transmitted = 0;
 
     while (uart_status_dr(&_uart_regs)) {
-        has_received = 1;
-
         uint8_t c = *_uart_regs.base;
         uint32_t next = (rx_head + 1) % RX_RING_SIZE;
 
         if (next != rx_tail) {
+            has_received = 1;
             rx_ring[rx_head] = c;
             rx_head = next;
         }
@@ -62,24 +60,25 @@ void uart_irq_handler() {
     }
 
     if (has_received) {
-        cpu_scheduler_fire(WAIT_UART_READ);
+        cpu_scheduler_fire(TASK_WAIT_UART_READ);
     }
     
+    uint8_t has_transmitted = 0;
+    
     while (uart_status_thre(&_uart_regs)) {
-        has_transmitted = 1;
-
         if (tx_head == tx_tail) {
             // Ring drained: stop asking for THR-empty interrupts.
             *_uart_regs.ier &= ~UART_IER_THR_EMPTY;
             break;
         }
 
+        has_transmitted = 1;
         *_uart_regs.base = tx_ring[tx_tail];
         tx_tail = (tx_tail + 1) % TX_RING_SIZE;
     }
 
     if (has_transmitted) {
-        cpu_scheduler_fire(WAIT_UART_WRITE);
+        cpu_scheduler_fire(TASK_WAIT_UART_WRITE);
     }
 }
 
