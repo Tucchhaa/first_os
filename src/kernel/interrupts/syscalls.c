@@ -6,8 +6,7 @@
 #include "../../uart/uart.h"
 #include "interrupts.h"
 #include "../task/kthreads.h"
-
-#include "../../converters.h"
+#include "../initrd/initrd_parser.h"
 
 extern void _switch_to_user();
 
@@ -20,7 +19,7 @@ static inline uint64_t _get_param_by_index(struct trapframe * tf, uint8_t index)
 }
 
 static inline void _syscall_set_result(struct trapframe * tf, uint64_t value) {
-    tf->regs[10] = value;
+    tf->regs[10] = value; // set a0 reg (return value)
 } 
 
 void _syscall_get_pid(struct trapframe * tf) {
@@ -58,7 +57,25 @@ void _syscall_uart_write(struct trapframe * tf) {
 }
 
 void _syscall_exec(struct trapframe * tf) {
+    const char * path = (const char *)_get_param_by_index(tf, 0);
+    uintptr_t file_addr = initrd_get_file_addr(path);
 
+    if (file_addr == 0) {
+        _syscall_set_result(tf, -1);
+        return;
+    }
+
+    uint32_t data_size;
+    uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
+
+    char * proc_addr = allocate(data_size); // todo: memory leak
+
+    for (uintptr_t i = 0; i < data_size; i += 1) {
+        proc_addr[i] = ((char *)file_data)[i];
+    }
+
+    kthread_create(kthread_exec_user, proc_addr);
+    _syscall_set_result(tf, 0);
 }
 
 void _syscall_fork(struct trapframe * tf) {
@@ -66,19 +83,19 @@ void _syscall_fork(struct trapframe * tf) {
     struct task * child_task = task_copy(current_task);
     child_task->thread.ra = (uint64_t)_switch_to_user;
 
-    struct trapframe * child_tf = (struct trapframe *)child_task->thread.sscratch;
-    child_tf->regs[10] = 0;
-    
     cpu_scheduler_add_task(child_task);
 
+    struct trapframe * child_tf = (struct trapframe *)child_task->thread.sscratch;
+    
+    _syscall_set_result(child_tf, 0);
     _syscall_set_result(tf, child_task->pid);
 }
 
-// TODO: task with pid may already be killed
+// TODO: task with pid may have already been killed
 void _syscall_waitpid(struct trapframe * tf) {
     struct task * current_task = get_current_task();
     uint32_t pid = (uint32_t)_get_param_by_index(tf, 0);
-    
+
     union task_wait_event_arg arg = { .i = pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
     set_need_reschedule_cpu(0);
@@ -94,7 +111,10 @@ void _syscall_exit(struct trapframe * tf) {
 }
 
 void _syscall_stop(struct trapframe * tf) {
+    uint32_t pid = _get_param_by_index(tf, 0);
+    uint8_t result = cpu_scheduler_kill_by_pid(pid);
 
+    _syscall_set_result(tf, result == 0 ? -1 : 0);
 }
 
 void syscall_handler(void * arg) {

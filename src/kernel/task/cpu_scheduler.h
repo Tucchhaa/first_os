@@ -11,6 +11,8 @@ void cpu_scheduler_add_task(struct task * task);
 
 void cpu_scheduler_kill();
 
+uint8_t cpu_scheduler_kill_by_pid(uint32_t pid);
+
 void cpu_scheduler_wait(uint32_t event_id);
 
 void cpu_scheduler_wait_arg(uint32_t event_id, union task_wait_event_arg arg);

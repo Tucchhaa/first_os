@@ -47,10 +47,11 @@ struct task * task_allocate() {
 struct task * task_copy(struct task * source) {
     struct task * task = allocate(sizeof(struct task));
 
-    task->pid = ++created_task_count;
     task->node.next = task->node.prev = 0;
+    task->pid = ++created_task_count;
     task->kernel_stack_addr = (uintptr_t)allocate(KERNEL_STACK_SIZE);
-    task->kernel_sp = task->kernel_stack_addr + (source->kernel_sp - source->kernel_stack_addr);
+    // task->kernel_sp = task->kernel_stack_addr + (source->kernel_sp - source->kernel_stack_addr);
+    task->kernel_sp = source->kernel_sp; // TODO: child task uses parent's stack
     task->user_stack_addr = 0;
     task->user_sp = 0;
     task->state = 0;
@@ -58,18 +59,24 @@ struct task * task_copy(struct task * source) {
     task->wait_event.arg.i = 0;
     task->arg = source->arg;
 
+    // Copy task.thread
     for (uint32_t i=0; i < KERNEL_STACK_SIZE; i++) {
         *((char *)(task->kernel_stack_addr + i)) = *((char *)(source->kernel_stack_addr + i));
     }
 
-    task->thread.sscratch = task->kernel_stack_addr + (source->thread.sscratch - source->kernel_stack_addr);
     task->thread.ra = source->thread.ra;
     task->thread.sp = task->kernel_sp;
+    task->thread.sscratch = task->kernel_stack_addr + (source->thread.sscratch - source->kernel_stack_addr);
     task->thread.sstatus = source->thread.sstatus;
 
     for (uint32_t i=0; i < 12; i++) {
         task->thread.s[i] = source->thread.s[i];
     }
+
+    // Update trapframe addresses
+    struct trapframe * trapframe = (struct trapframe *)task->thread.sscratch;
+    trapframe->regs[2] = task->kernel_sp; // set sp reg
+    trapframe->regs[4] = (uint64_t)task; // set tp reg
 
     return task;
 }

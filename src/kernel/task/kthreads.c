@@ -11,7 +11,6 @@ extern void _switch_to_user();
 
 struct task * kthread_create(void (*entry_point)(void), void * arg) {
     struct task * task = task_allocate();
-    task->state = TASK_STATE_READY;
     task->wait_event.id = TASK_WAIT_NONE;
     task->thread.ra = (uint64_t)entry_point;
     // status.spp actaully is not needed here, because kthread is never sret'ed
