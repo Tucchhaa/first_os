@@ -43,6 +43,13 @@ void interrupts_disable_timer() { csr_sie_disable(CSR_SIE_STIE); }
 
 void _interrupts_external_handler(void * arg);
 
+uint8_t _interrupts_convert_plic_priority(uint8_t plic_priority) {
+    const uint8_t PLIC_MAX_PRIORITY = 7;
+    const uint8_t HANDLER_MAX_PRIORITY = 255;
+
+    return HANDLER_MAX_PRIORITY - (plic_priority * HANDLER_MAX_PRIORITY / PLIC_MAX_PRIORITY);
+}
+
 static void _interrupts_get_handler(
     void (**handler)(void *),
     void ** arg,
@@ -55,12 +62,11 @@ static void _interrupts_get_handler(
     {
     case ((1ULL << 63) | 5): // is_timer
         timeouts_postpone();
-        *priority = 1;
+        *priority = 200;
         *arg = 0;
         *handler = &timeouts_interrupt_handler;
         break;
     case ((1ULL << 63) | 9): // is_external
-        // uart_puts("external\n");
         *priority = 1;
         *arg = (void *)plic_claim();
         *handler = &_interrupts_external_handler;

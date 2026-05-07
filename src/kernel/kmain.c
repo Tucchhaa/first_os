@@ -57,8 +57,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     sbi_setup();
     uart_sync_setup();
 
-    // char a[5];
-    // uart_sync_getline(a, 2);
+    char a[5];
+    uart_sync_getline(a, 2);
 
     uart_sync_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
