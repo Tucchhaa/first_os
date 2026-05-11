@@ -15,6 +15,7 @@
 #include "task/task.h"
 #include "task/kthreads.h"
 #include "task/cpu_scheduler.h"
+#include "../drivers/video/video.h"
 
 void thread_entry() {
     char a[40], b[40];
@@ -89,6 +90,7 @@ static void kernel_setup(uintptr_t _fdt_addr) {
     uart_sync_puts("\n");
 
     memory_setup();
+    video_setup();
     interrupt_setup();
     plic_setup();
     uart_setup();

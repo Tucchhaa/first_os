@@ -6,6 +6,7 @@
 #include "../../uart/uart.h"
 #include "../task/kthreads.h"
 #include "../initrd/initrd_parser.h"
+#include "../../drivers/video/video.h"
 
 extern void _switch_to_user();
 
@@ -71,7 +72,11 @@ void _syscall_exec(struct trapframe * tf) {
         proc_addr[i] = ((char *)file_data)[i];
     }
 
-    kthread_create(kthread_exec_user, proc_addr);
+    struct task * new_task = kthread_create(kthread_exec_user, proc_addr);
+
+    union task_wait_event_arg arg = { .i = new_task->pid };
+    cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
+
     _syscall_set_result(tf, 0);
 }
 
@@ -117,7 +122,7 @@ void _syscall_display(struct trapframe * tf) {
     uint32_t width = (uint32_t)_get_param_by_index(tf, 1);
     uint32_t height = (uint32_t)_get_param_by_index(tf, 2);
 
-
+    video_bmp_display(bmp_image, width, height);
 }
 
 void _syscall_usleep(struct trapframe * tf) {

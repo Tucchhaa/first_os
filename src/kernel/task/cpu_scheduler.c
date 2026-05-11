@@ -96,7 +96,7 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
     uint8_t pie = interrupts_disable();
 
     // TODO: implement pid table
-    struct task * task = (struct task *)ready_queue.head;
+    struct task * task = _get_task_from_node(ready_queue.head);
 
     while (task) {
         if (task->pid == pid) {
@@ -106,10 +106,10 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
             return 0;
         }
 
-        task = (struct task *)task->node.next;
+        task = _get_task_from_node(task->node.next);
     } 
 
-    task = (struct task *)waiting_queue.head;
+    task = _get_task_from_node(waiting_queue.head);
 
     while (task) {
         if (task->pid == pid) {
@@ -119,7 +119,7 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
             return 0;
         }
 
-        task = (struct task *)task->node.next;
+        task = _get_task_from_node(task->node.next);
     } 
 
     interrupts_restore(pie);

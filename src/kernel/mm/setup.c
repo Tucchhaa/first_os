@@ -52,7 +52,6 @@ void memory_setup() {
         uart_sync_puts_variadic("[KERNEL] reserve FDT memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve(fdt_addr, fdt_size);
 
-
         i64tox(initrd_start_addr, buf1);
         i64tox(initrd_size, buf2);
         uart_sync_puts_variadic("[KERNEL] reserve INITRD memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);

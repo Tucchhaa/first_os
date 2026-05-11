@@ -85,8 +85,11 @@ class Project:
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             obj_files.append(out_path)
 
-            cmd = [COMPILER] + ["-c", "-mcmodel=medany", f"-DPLATFORM_{self.platform.upper()}"] + [c_file, "-o", out_path]
-            
+            cmd = [COMPILER]
+            cmd += ["-march=rv64gc_zicbom", "-O2", "-ffreestanding", "-nostdlib"]
+            cmd += ["-c", "-mcmodel=medany", f"-DPLATFORM_{self.platform.upper()}"] 
+            cmd += [c_file, "-o", out_path]
+
             execute(cmd)
 
         # Linking
@@ -94,7 +97,12 @@ class Project:
 
         linker_path = os.path.join(self.platform_dir, self.linker_script)
         elf_path = os.path.join(BUILD_DIR, f"{self.name}.elf")
-        cmd = [LINKER] + ["-T", linker_path] + ["-o", elf_path] + obj_files 
+
+        libgcc_path = subprocess.check_output(
+            [COMPILER, "-march=rv64gc_zicbom", "-mcmodel=medany", "-print-libgcc-file-name"]
+        ).decode().strip()
+
+        cmd = [LINKER] + ["-T", linker_path] + ["-o", elf_path] + obj_files + [libgcc_path]
 
         execute(cmd)
 
@@ -195,6 +203,7 @@ class Kernel(Project):
             "src/kernel/mm/setup.c",
             "src/kernel/mm/page_allocator.c",
             "src/kernel/mm/dynamic_allocator.c",
+            "src/kernel/mm/utils.c",
             "src/kernel/interrupts/interrupt_entry.S",
             "src/kernel/interrupts/interrupt_handler.c",
             "src/kernel/interrupts/interrupt_control.c",
@@ -208,5 +217,14 @@ class Kernel(Project):
             "src/kernel/task/kthreads.c",
             "src/kernel/task/cpu_scheduler.c",
         ]
+
+        if platform == "qemu":
+            self.source_files += [
+                "src/drivers/video/video_qemu.c"
+            ]
+        elif platform == "opirv2":
+            self.source_files += [
+                "src/drivers/video/video_opirv2.c"
+            ]
 
 main()
