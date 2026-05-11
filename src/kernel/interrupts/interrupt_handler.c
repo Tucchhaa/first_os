@@ -23,7 +23,7 @@ void set_need_reschedule_cpu() {
 
 void _interrupt_entry();
 
-void interrupts_setup() {
+void interrupt_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
     interrupt_tasks_setup();
@@ -33,16 +33,16 @@ void interrupts_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
 
-void _interrupts_external_handler(void * arg);
+void _interrupt_external_handler(void * arg);
 
-static uint8_t _interrupts_convert_plic_priority(uint8_t plic_priority) {
+static uint8_t _convert_plic_priority(uint8_t plic_priority) {
     const uint8_t PLIC_MAX_PRIORITY = 7;
     const uint8_t HANDLER_MAX_PRIORITY = 255;
 
     return HANDLER_MAX_PRIORITY - (plic_priority * HANDLER_MAX_PRIORITY / PLIC_MAX_PRIORITY);
 }
 
-static void _interrupts_get_handler(
+static void _interrupt_get_handler(
     void (**handler)(void *),
     void ** arg,
     uint8_t * priority,
@@ -61,7 +61,7 @@ static void _interrupts_get_handler(
     case ((1ULL << 63) | 9): // is_external
         *priority = 1;
         *arg = (void *)((uint64_t)plic_claim());
-        *handler = &_interrupts_external_handler;
+        *handler = &_interrupt_external_handler;
         break;
     default:
         *priority = 1;
@@ -71,13 +71,13 @@ static void _interrupts_get_handler(
     }
 }
 
-void interrupts_handler(struct trapframe * trapframe) {
+void interrupt_handler(struct trapframe * trapframe) {
     static uint8_t is_tasks_executing = 0;
 
     void (*handler)(void *);
     uint8_t priority;
     void * arg;
-    _interrupts_get_handler(&handler, &arg, &priority, trapframe);
+    _interrupt_get_handler(&handler, &arg, &priority, trapframe);
 
     interrupt_tasks_add(handler, arg, priority);
 
@@ -106,7 +106,7 @@ void interrupts_handler(struct trapframe * trapframe) {
     }
 }
 
-void _interrupts_external_handler(void * arg) {
+void _interrupt_external_handler(void * arg) {
     uint32_t irq = (uint32_t)((uint64_t)arg);
 
     if (irq == uart_irq) {

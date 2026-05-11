@@ -12,7 +12,8 @@ enum task_wait_event_id {
     TASK_WAIT_NONE,
     TASK_WAIT_PROCESS_KILL,
     TASK_WAIT_UART_READ,
-    TASK_WAIT_UART_WRITE
+    TASK_WAIT_UART_WRITE,
+    TASK_WAIT_TIMEOUT
 };
 
 enum task_state {

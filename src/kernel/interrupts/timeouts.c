@@ -53,11 +53,11 @@ void timeouts_setup() {
     _set_next_timeout();
 }
 
-uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms) {
+uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_us) {
     struct timeout_entry * entry = allocate(sizeof(struct timeout_entry));
     entry->callback = callback;
     entry->arg = arg;
-    entry->target_time = sbi_read_time() + (cpu_frequency / 1000) * timeout_ms;
+    entry->target_time = sbi_read_time() + (cpu_frequency / 1000000) * timeout_us;
     entry->id = ++created_timeouts_count;
 
     uint8_t pie = interrupts_disable();

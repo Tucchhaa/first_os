@@ -27,4 +27,6 @@ void cpu_scheduler_fire_cond(
 
 void cpu_scheduler_next();
 
+void cpu_scheduler_sleep(uint32_t usec);
+
 void cpu_scheduler_idle();

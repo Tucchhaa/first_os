@@ -112,6 +112,22 @@ void _syscall_stop(struct trapframe * tf) {
     _syscall_set_result(tf, result == 0 ? 0 : -1);
 }
 
+void _syscall_display(struct trapframe * tf) {
+    uint32_t * bmp_image = (uint32_t *)_get_param_by_index(tf, 0);
+    uint32_t width = (uint32_t)_get_param_by_index(tf, 1);
+    uint32_t height = (uint32_t)_get_param_by_index(tf, 2);
+
+
+}
+
+void _syscall_usleep(struct trapframe * tf) {
+    uint32_t usec = (uint32_t)_get_param_by_index(tf, 0);
+
+    cpu_scheduler_sleep(usec);
+
+    _syscall_set_result(tf, 0);
+}
+
 void syscall_handler(void * arg) {
     struct trapframe * tf = (struct trapframe *)arg;
     tf->sepc += 4;
@@ -126,6 +142,8 @@ void syscall_handler(void * arg) {
     case 5: return _syscall_waitpid(tf);
     case 6: return _syscall_exit(tf);
     case 7: return _syscall_stop(tf);
+    case 8: return _syscall_display(tf);
+    case 9: return _syscall_usleep(tf);
     default:
         return;
     }

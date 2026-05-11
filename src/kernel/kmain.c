@@ -89,7 +89,7 @@ static void kernel_setup(uintptr_t _fdt_addr) {
     uart_sync_puts("\n");
 
     memory_setup();
-    interrupts_setup();
+    interrupt_setup();
     plic_setup();
     uart_setup();
 
@@ -312,7 +312,7 @@ static void command_settimeout(const char * command) {
         return;
     }
 
-    set_timeout(timeout_func, message, seconds * 1000);
+    set_timeout(timeout_func, message, seconds * 1000000);
 }
 
 static void schedule_timeout(void *) {
@@ -320,5 +320,5 @@ static void schedule_timeout(void *) {
     itoa((sbi_read_time() / cpu_frequency), c);
     uart_puts_variadic("boot time: ", c , "\n", 0);
 
-    set_timeout(schedule_timeout, (void *)0, 10000);
+    set_timeout(schedule_timeout, (void *)0, 10000000);
 }

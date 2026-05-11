@@ -8,7 +8,7 @@ void timeouts_setup();
 
 void timeouts_postpone();
 
-uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_ms);
+uint32_t set_timeout(void (*callback)(void *), void * arg, uint64_t timeout_us);
 
 void clear_timeout(uint32_t timeout_id);
 

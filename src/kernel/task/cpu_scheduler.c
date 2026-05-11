@@ -19,7 +19,7 @@ static struct linked_list killed_queue;
 static struct task bootstrap;
 static struct task * idle_task;
 
-static const uint32_t time_quantum = 31; // 1/32 second
+static const uint32_t time_quantum = 31250; // 31250 usec = 1/32 sec
 static uint32_t timeout_id;
 
 extern void _switch_to_kernel(struct task * prev, struct task * next);
@@ -46,6 +46,7 @@ static struct task * _get_task_from_node(struct linked_list_node * node) {
 
     uintptr_t node_addr = (uintptr_t)node;
     uintptr_t task_addr = node_addr - offsetof(struct task, node);
+
     return (struct task *)task_addr;
 }
 
@@ -63,8 +64,11 @@ void cpu_scheduler_add_task(struct task * task) {
 }
 
 static uint8_t _task_pid_matches(struct task * task, void * arg) {
-    uint32_t pid = *(uint32_t *)arg;
-    return task->wait_event.arg.i == pid;
+    return task->pid == (uint32_t)((uint64_t)arg);
+}
+
+static uint8_t _task_wait_arg_matches(struct task * task, void * arg) {
+    return task->wait_event.arg.i == (uint32_t)((uint64_t)arg);
 }
 
 static void _cpu_scheduler_kill_core(struct task * task) {
@@ -74,7 +78,9 @@ static void _cpu_scheduler_kill_core(struct task * task) {
     linked_list_insert(&killed_queue, &task->node);
     interrupts_restore(pie);
 
-    cpu_scheduler_fire_cond(TASK_WAIT_PROCESS_KILL, _task_pid_matches, &task->pid);
+    cpu_scheduler_fire_cond(
+        TASK_WAIT_PROCESS_KILL, _task_wait_arg_matches, (void *)((uint64_t)task->pid)
+    );
 }
 
 void cpu_scheduler_kill() {
@@ -173,6 +179,19 @@ void cpu_scheduler_fire_cond(
     }
 
     interrupts_restore(pie);
+}
+
+void _cpu_scheduler_fire_timeout(void * arg) {
+    cpu_scheduler_fire_cond(TASK_WAIT_TIMEOUT, _task_pid_matches, arg);
+}
+
+void cpu_scheduler_sleep(uint32_t usec) {
+    set_timeout(
+        _cpu_scheduler_fire_timeout, 
+        (void *)((uint64_t)get_current_task()->pid), 
+        usec
+    );
+    cpu_scheduler_wait(TASK_WAIT_TIMEOUT);
 }
 
 void cpu_scheduler_next() {

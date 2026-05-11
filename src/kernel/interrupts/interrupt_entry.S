@@ -55,7 +55,7 @@ _interrupt_entry:
 
   # --- [JUMP TO TRAP HANDLER] ---
   mv a0, t0
-  call interrupts_handler
+  call interrupt_handler
 
   # --- [RESTORE CPU STATE] ---
 
