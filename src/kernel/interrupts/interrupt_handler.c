@@ -1,5 +1,4 @@
-
-#include "interrupts.h"
+#include "interrupt_handler.h"
 
 #include <stdint.h>
 
@@ -7,6 +6,7 @@
 #include "plic.h"
 #include "timeouts.h"
 #include "syscalls.h"
+#include "interrupt_control.h"
 #include "interrupt_tasks.h"
 #include "../task/task.h"
 #include "../task/cpu_scheduler.h"
@@ -21,27 +21,17 @@ void set_need_reschedule_cpu() {
     _need_reschedule_cpu = 1; 
 }
 
-void _interrupts_entry();
+void _interrupt_entry();
 
 void interrupts_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
 
     interrupt_tasks_setup();
     timeouts_setup();
-    csr_stvec_set((uintptr_t)_interrupts_entry);
+    csr_stvec_set((uintptr_t)_interrupt_entry);
 
     uart_sync_puts("[KERNEL:INTERRUPTS] Done setting up\n");
 }
-
-void interrupts_enable() { csr_sstatus_enable(CSR_SSTATUS_SIE); }
-void interrupts_restore(uint8_t pie) { if (pie) csr_sstatus_enable(CSR_SSTATUS_SIE); }
-uint8_t interrupts_disable() { return csr_sstatus_rdisable(CSR_SSTATUS_SIE); }
-
-void interrupts_enable_external() { csr_sie_enable(CSR_SIE_SEIE); }
-void interrupts_disable_external() { csr_sie_disable(CSR_SIE_SEIE); }
-
-void interrupts_enable_timer() { csr_sie_enable(CSR_SIE_STIE); }
-void interrupts_disable_timer() { csr_sie_disable(CSR_SIE_STIE); }
 
 void _interrupts_external_handler(void * arg);
 
@@ -70,7 +60,7 @@ static void _interrupts_get_handler(
         break;
     case ((1ULL << 63) | 9): // is_external
         *priority = 1;
-        *arg = (void *)plic_claim();
+        *arg = (void *)((uint64_t)plic_claim());
         *handler = &_interrupts_external_handler;
         break;
     default:
@@ -117,7 +107,7 @@ void interrupts_handler(struct trapframe * trapframe) {
 }
 
 void _interrupts_external_handler(void * arg) {
-    uint32_t irq = (uint32_t)arg;
+    uint32_t irq = (uint32_t)((uint64_t)arg);
 
     if (irq == uart_irq) {
         uart_irq_handler();

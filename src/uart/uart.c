@@ -8,7 +8,7 @@
 #include "../string.h"
 #include "../kernel/task/task.h"
 #include "../kernel/interrupts/plic.h"
-#include "../kernel/interrupts/interrupts.h"
+#include "../kernel/interrupts/interrupt_control.h"
 #include "../kernel/task/cpu_scheduler.h"
 
 #define RX_RING_SIZE 512

@@ -1,7 +1,7 @@
 #include "interrupt_tasks.h"
 
 #include "../ds/linked_list.h"
-#include "interrupts.h"
+#include "interrupt_control.h"
 
 #define TASKS_BUFFER_SIZE 128
 

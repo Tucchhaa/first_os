@@ -1,8 +1,8 @@
 .section ".text"
-.globl _interrupts_entry
+.globl _interrupt_entry
 .p2align 2
 
-_interrupts_entry:
+_interrupt_entry:
   # --- [SAVE CPU STATE] ---
 
   # --- sscratch is a pointer to struct process  ---

@@ -6,7 +6,8 @@
 #include "task.h"
 #include "../mm/dynamic_allocator.h"
 #include "../interrupts/timeouts.h"
-#include "../interrupts/interrupts.h"
+#include "../interrupts/interrupt_handler.h"
+#include "../interrupts/interrupt_control.h"
 
 #include "../../uart/uart.h"
 #include "../../converters.h"
@@ -18,7 +19,7 @@ static struct linked_list killed_queue;
 static struct task bootstrap;
 static struct task * idle_task;
 
-static const uint32_t time_quantum = 200;
+static const uint32_t time_quantum = 31; // 1/32 second
 static uint32_t timeout_id;
 
 extern void _switch_to_kernel(struct task * prev, struct task * next);

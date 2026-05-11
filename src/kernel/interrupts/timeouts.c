@@ -1,6 +1,6 @@
 #include "timeouts.h"
 
-#include "interrupts.h"
+#include "interrupt_control.h"
 #include "../ds/linked_list.h"
 #include "../mm/dynamic_allocator.h"
 #include "../../fdt/fdt.h"

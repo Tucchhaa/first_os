@@ -4,7 +4,6 @@
 #include "../task/cpu_scheduler.h"
 #include "../mm/dynamic_allocator.h"
 #include "../../uart/uart.h"
-#include "interrupts.h"
 #include "../task/kthreads.h"
 #include "../initrd/initrd_parser.h"
 
