@@ -44,14 +44,21 @@ struct task * task_allocate() {
     return task;
 }
 
+static inline uintptr_t _rebase_stack_addr(
+    struct task * task,
+    struct task * source,
+    uintptr_t source_addr
+) {
+    return task->kernel_stack_addr + (source_addr - source->kernel_stack_addr);
+}
+
 struct task * task_copy(struct task * source) {
     struct task * task = allocate(sizeof(struct task));
 
     task->node.next = task->node.prev = 0;
     task->pid = ++created_task_count;
     task->kernel_stack_addr = (uintptr_t)allocate(KERNEL_STACK_SIZE);
-    // task->kernel_sp = task->kernel_stack_addr + (source->kernel_sp - source->kernel_stack_addr);
-    task->kernel_sp = source->kernel_sp; // TODO: child task uses parent's stack
+    task->kernel_sp = _rebase_stack_addr(task, source, source->kernel_sp);
     task->user_stack_addr = 0;
     task->user_sp = 0;
     task->state = 0;
@@ -59,14 +66,15 @@ struct task * task_copy(struct task * source) {
     task->wait_event.arg.i = 0;
     task->arg = source->arg;
 
-    // Copy task.thread
+    // Copy stack
     for (uint32_t i=0; i < KERNEL_STACK_SIZE; i++) {
         *((char *)(task->kernel_stack_addr + i)) = *((char *)(source->kernel_stack_addr + i));
     }
-
+    
+    // Copy task.thread
     task->thread.ra = source->thread.ra;
     task->thread.sp = task->kernel_sp;
-    task->thread.sscratch = task->kernel_stack_addr + (source->thread.sscratch - source->kernel_stack_addr);
+    task->thread.sscratch = _rebase_stack_addr(task, source, source->thread.sscratch);
     task->thread.sstatus = source->thread.sstatus;
 
     for (uint32_t i=0; i < 12; i++) {
@@ -74,8 +82,10 @@ struct task * task_copy(struct task * source) {
     }
 
     // Update trapframe addresses
+    struct trapframe * source_trapframe = (struct trapframe *)source->thread.sscratch;
     struct trapframe * trapframe = (struct trapframe *)task->thread.sscratch;
-    trapframe->regs[2] = task->kernel_sp; // set sp reg
+
+    trapframe->regs[2] = _rebase_stack_addr(task, source, source_trapframe->regs[2]);
     trapframe->regs[4] = (uint64_t)task; // set tp reg
 
     return task;

@@ -27,8 +27,6 @@ static inline void set_current_task(struct task * task) {
     asm volatile ("mv tp, %0" :: "r"(task) :);
 }
 
-// TODO: make kill() and wait() reschedule cpu automatically
-
 void cpu_scheduler_init() {
     linked_list_init(&ready_queue);
     linked_list_init(&waiting_queue);
@@ -48,6 +46,10 @@ static struct task * _get_task_from_node(struct linked_list_node * node) {
     uintptr_t node_addr = (uintptr_t)node;
     uintptr_t task_addr = node_addr - offsetof(struct task, node);
     return (struct task *)task_addr;
+}
+
+static void _set_need_reschedule_cpu(void *) {
+    set_need_reschedule_cpu();
 }
 
 void cpu_scheduler_add_task(struct task * task) {
@@ -76,23 +78,25 @@ static void _cpu_scheduler_kill_core(struct task * task) {
 
 void cpu_scheduler_kill() {
     _cpu_scheduler_kill_core(get_current_task());
+    cpu_scheduler_next();
 }
 
 uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
     if (pid == get_current_task()->pid) {
-        return 0;
+        return 1;
     }
 
     uint8_t pie = interrupts_disable();
 
+    // TODO: implement pid table
     struct task * task = (struct task *)ready_queue.head;
 
     while (task) {
         if (task->pid == pid) {
             linked_list_remove(&ready_queue, &task->node);
-            _cpu_scheduler_kill_core(task);
             interrupts_restore(pie);
-            return 1;
+            _cpu_scheduler_kill_core(task);
+            return 0;
         }
 
         task = (struct task *)task->node.next;
@@ -103,9 +107,9 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
     while (task) {
         if (task->pid == pid) {
             linked_list_remove(&waiting_queue, &task->node);
-            _cpu_scheduler_kill_core(task);
             interrupts_restore(pie);
-            return 1;
+            _cpu_scheduler_kill_core(task);
+            return 0;
         }
 
         task = (struct task *)task->node.next;
@@ -113,7 +117,7 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
 
     interrupts_restore(pie);
 
-    return 0;
+    return 1;
 }
 
 void cpu_scheduler_wait(uint32_t event_id) {
@@ -132,6 +136,7 @@ void cpu_scheduler_wait_arg(uint32_t event_id, union task_wait_event_arg arg) {
     linked_list_insert(&waiting_queue, &current_task->node);
 
     interrupts_restore(pie);
+    cpu_scheduler_next();
 }
 
 void cpu_scheduler_fire(uint32_t event_id) {
@@ -170,6 +175,11 @@ void cpu_scheduler_fire_cond(
 }
 
 void cpu_scheduler_next() {
+    if (is_handling_interrupt) {
+        set_need_reschedule_cpu();
+        return;
+    }
+
     uint8_t pie = interrupts_disable();
 
     if (ready_queue.head == 0) {
@@ -178,14 +188,13 @@ void cpu_scheduler_next() {
     }
 
     clear_timeout(timeout_id);
-    timeout_id = set_timeout(set_need_reschedule_cpu, 0, time_quantum);
+    timeout_id = set_timeout(_set_need_reschedule_cpu, 0, time_quantum);
 
     struct task * prev = get_current_task();
     struct task * next = _get_task_from_node(ready_queue.head);
 
     if (prev->state == TASK_STATE_RUNNING) {
         prev->state = TASK_STATE_READY;
-
         linked_list_insert(&ready_queue, &prev->node);
     }
 
@@ -197,7 +206,6 @@ void cpu_scheduler_next() {
     _switch_to_kernel(prev, next);
 }
 
-// TODO: if there is always some task, killed tasks will never be freed
 void cpu_scheduler_idle() {
     while (1) {
         while (1) {

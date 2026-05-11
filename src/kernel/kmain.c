@@ -15,13 +15,6 @@
 #include "task/kthreads.h"
 #include "task/cpu_scheduler.h"
 
-static void command_info(void);
-static void command_ls(void);
-static void command_cat(const char * command);
-static void command_exec(void);
-static void command_settimeout(const char * command);
-static void schedule_timeout(void *);
-
 void thread_entry() {
     char a[40], b[40];
     itoa(get_current_task()->pid, a);
@@ -40,6 +33,12 @@ void thread_entry() {
     kthread_exit();
 }
 
+static void kernel_setup(uintptr_t _fdt_addr);
+
+static void kernel_cli();
+
+static void schedule_timeout(void *);
+
 /*
 TODO:
 - support multiple memory regions
@@ -47,9 +46,24 @@ TODO:
 - optimize page allocator
 - implement self relocating bootloader
 - support interrupt task preemption
-- when sret to user process: 1) clean all registers 2) use user stack
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
+    kernel_setup(_fdt_addr);
+
+    kthread_create(kernel_cli, 0);
+
+    // for (int i=0; i < 3; i++) {
+    //     kthread_create(thread_entry, 0);
+    // }
+    
+    // schedule_timeout(0);
+    
+    // command_exec();
+
+    cpu_scheduler_idle();
+}
+
+static void kernel_setup(uintptr_t _fdt_addr) {
     if (fdt_setup(_fdt_addr) == 0) {
         return;
     }
@@ -57,8 +71,8 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     sbi_setup();
     uart_sync_setup();
 
-    char a[5];
-    uart_sync_getline(a, 2);
+    // char a[5];
+    // uart_sync_getline(a, 2);
 
     uart_sync_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
@@ -77,24 +91,20 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     interrupts_setup();
     plic_setup();
     uart_setup();
-    // interrupts_enable();
+
     interrupts_enable_external();
     interrupts_enable_timer();
 
-    // ===================
     cpu_scheduler_init();
+}
 
-    // for (int i=0; i < 3; i++) {
-    //     kthread_create(thread_entry, 0);
-    // }
+static void command_info(void);
+static void command_ls(void);
+static void command_cat(const char * command);
+static void command_exec(void);
+static void command_settimeout(const char * command);
 
-    command_exec();
-
-    cpu_scheduler_idle();
-
-    // ===================
-    schedule_timeout(0);
-    
+static void kernel_cli() {
     const int command_max_size = 100;
     char command[command_max_size];
 
@@ -257,7 +267,10 @@ static void command_exec(void) {
     i64tox((uintptr_t)proc_addr, a);
     uart_sync_puts_variadic("proc_addr: ", a, "\n", 0);
 
-    kthread_create(kthread_exec_user, proc_addr);
+    struct task * task = kthread_create(kthread_exec_user, proc_addr);
+
+    union task_wait_event_arg arg = { .i = task->pid };
+    cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
 }
 
 static void timeout_func(void * arg) {

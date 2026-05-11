@@ -39,5 +39,4 @@ void kthread_exec_user() {
 
 void kthread_exit() {
     cpu_scheduler_kill();
-    cpu_scheduler_next();
 }

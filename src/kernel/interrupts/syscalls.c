@@ -33,7 +33,6 @@ void _syscall_uart_read(struct trapframe * tf) {
     if (uart_receive_buf_empty()) {
         tf->sepc -= 4;
         cpu_scheduler_wait(TASK_WAIT_UART_READ);
-        set_need_reschedule_cpu(0);
         return;
     }
 
@@ -48,7 +47,6 @@ void _syscall_uart_write(struct trapframe * tf) {
     if (uart_transmit_buf_full()) {
         tf->sepc -= 4;
         cpu_scheduler_wait(TASK_WAIT_UART_WRITE);
-        set_need_reschedule_cpu(0);
         return;
     }
 
@@ -98,7 +96,6 @@ void _syscall_waitpid(struct trapframe * tf) {
 
     union task_wait_event_arg arg = { .i = pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
-    set_need_reschedule_cpu(0);
 
     _syscall_set_result(tf, pid);
 }
@@ -107,14 +104,13 @@ void _syscall_exit(struct trapframe * tf) {
     uint32_t status = (uint32_t)_get_param_by_index(tf, 0);
 
     cpu_scheduler_kill();
-    set_need_reschedule_cpu(0);
 }
 
 void _syscall_stop(struct trapframe * tf) {
     uint32_t pid = _get_param_by_index(tf, 0);
     uint8_t result = cpu_scheduler_kill_by_pid(pid);
 
-    _syscall_set_result(tf, result == 0 ? -1 : 0);
+    _syscall_set_result(tf, result == 0 ? 0 : -1);
 }
 
 void syscall_handler(void * arg) {

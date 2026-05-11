@@ -13,9 +13,11 @@
 #include "../../uart/uart_sync.h"
 #include "../../uart/uart.h"
 
+uint8_t is_handling_interrupt = 0;
+
 static uint8_t _need_reschedule_cpu = 0;
 
-void set_need_reschedule_cpu(void *) { 
+void set_need_reschedule_cpu() { 
     _need_reschedule_cpu = 1; 
 }
 
@@ -43,7 +45,7 @@ void interrupts_disable_timer() { csr_sie_disable(CSR_SIE_STIE); }
 
 void _interrupts_external_handler(void * arg);
 
-uint8_t _interrupts_convert_plic_priority(uint8_t plic_priority) {
+static uint8_t _interrupts_convert_plic_priority(uint8_t plic_priority) {
     const uint8_t PLIC_MAX_PRIORITY = 7;
     const uint8_t HANDLER_MAX_PRIORITY = 255;
 
@@ -93,6 +95,7 @@ void interrupts_handler(struct trapframe * trapframe) {
         return;
     }
 
+    is_handling_interrupt = 1;
     is_tasks_executing = 1;
 
     struct trapframe nested_trapframe;
@@ -103,7 +106,9 @@ void interrupts_handler(struct trapframe * trapframe) {
     interrupts_disable();
 
     csr_sscratch_set((uintptr_t)trapframe);
+
     is_tasks_executing = 0;
+    is_handling_interrupt = 0;
 
     if (_need_reschedule_cpu) {
         _need_reschedule_cpu = 0;

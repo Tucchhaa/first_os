@@ -4,7 +4,9 @@
 
 struct trapframe;
 
-void set_need_reschedule_cpu(void *);
+extern uint8_t is_handling_interrupt;
+
+void set_need_reschedule_cpu();
 
 void interrupts_setup();
 
