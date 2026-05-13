@@ -4,6 +4,7 @@
 
 #include "kthreads.h"
 #include "task.h"
+#include "task_table.h"
 #include "../mm/dynamic_allocator.h"
 #include "../interrupts/timeouts.h"
 #include "../interrupts/interrupt_handler.h"
@@ -29,6 +30,8 @@ static inline void set_current_task(struct task * task) {
 }
 
 void cpu_scheduler_init() {
+    task_table_setup();
+
     linked_list_init(&ready_queue);
     linked_list_init(&waiting_queue);
     linked_list_init(&killed_queue);
@@ -37,6 +40,7 @@ void cpu_scheduler_init() {
     set_current_task(&bootstrap);
 
     idle_task = kthread_create(cpu_scheduler_idle, 0);
+    cpu_scheduler_add_task(idle_task);
 }
 
 static struct task * _get_task_from_node(struct linked_list_node * node) {
@@ -59,6 +63,7 @@ void cpu_scheduler_add_task(struct task * task) {
 
     task->state = TASK_STATE_READY;
     linked_list_insert(&ready_queue, &task->node);
+    task_table_add_task(task);
 
     interrupts_restore(pie);
 }
@@ -71,6 +76,7 @@ static uint8_t _task_wait_arg_matches(struct task * task, void * arg) {
     return task->wait_event.arg.i == (uint32_t)((uint64_t)arg);
 }
 
+// TODO: merge kill functions into one
 static void _cpu_scheduler_kill_core(struct task * task) {
     uint8_t pie = interrupts_disable();
     task->state = TASK_STATE_KILLED;
@@ -79,7 +85,9 @@ static void _cpu_scheduler_kill_core(struct task * task) {
     interrupts_restore(pie);
 
     cpu_scheduler_fire_cond(
-        TASK_WAIT_PROCESS_KILL, _task_wait_arg_matches, (void *)((uint64_t)task->pid)
+        TASK_WAIT_PROCESS_KILL, 
+        _task_wait_arg_matches, 
+        (void *)((uint64_t)task->pid)
     );
 }
 
@@ -95,36 +103,24 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
 
     uint8_t pie = interrupts_disable();
 
-    // TODO: implement pid table
-    struct task * task = _get_task_from_node(ready_queue.head);
+    struct task * task = task_table_get_task(pid);
 
-    while (task) {
-        if (task->pid == pid) {
-            linked_list_remove(&ready_queue, &task->node);
-            interrupts_restore(pie);
-            _cpu_scheduler_kill_core(task);
-            return 0;
-        }
+    if (task == 0 || task->state == TASK_STATE_KILLED) {
+        interrupts_restore(pie);
+        return 1;
+    }
 
-        task = _get_task_from_node(task->node.next);
-    } 
-
-    task = _get_task_from_node(waiting_queue.head);
-
-    while (task) {
-        if (task->pid == pid) {
-            linked_list_remove(&waiting_queue, &task->node);
-            interrupts_restore(pie);
-            _cpu_scheduler_kill_core(task);
-            return 0;
-        }
-
-        task = _get_task_from_node(task->node.next);
-    } 
+    if (task->state == TASK_STATE_READY) {
+        linked_list_remove(&ready_queue, &task->node);
+    }
+    else if (task->state == TASK_STATE_WAITING) {
+        linked_list_remove(&waiting_queue, &task->node);
+    }
 
     interrupts_restore(pie);
+    _cpu_scheduler_kill_core(task);
 
-    return 1;
+    return 0;
 }
 
 void cpu_scheduler_wait(uint32_t event_id) {
@@ -239,12 +235,12 @@ void cpu_scheduler_idle() {
             }
 
             linked_list_remove(&killed_queue, node);
-
             interrupts_restore(pie);
 
             struct task * task = _get_task_from_node(node);
-            free((void *)task->kernel_stack_addr);
-            free((void *)task);
+            task_table_remove_task(task);
+
+            task_free(task);
         }
 
         cpu_scheduler_next();

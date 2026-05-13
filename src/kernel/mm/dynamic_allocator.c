@@ -1,6 +1,7 @@
 #include "dynamic_allocator.h"
 
 #include "../ds/linked_list.h"
+#include "../interrupts/interrupt_control.h"
 #include "page_allocator.h"
 
 struct pool {
@@ -30,18 +31,21 @@ static uint8_t _get_pool_index(uint32_t size) {
 }
 
 void * allocate(uint32_t size) {
+    uint8_t pie = interrupts_disable();
     uint8_t pool_index = _get_pool_index(size);
     
     if (pool_index == 0xFF) {
         void * block_addr = memory_allocate_pages(size);
 
         if (block_addr == 0) {
+            interrupts_restore(pie);
             return 0;
         }
 
         struct page * page = memory_page_metadata((uintptr_t)block_addr);
         page->pool_index = 0xFF;
         
+        interrupts_restore(pie);
         return block_addr;
     }
 
@@ -51,6 +55,7 @@ void * allocate(uint32_t size) {
         void * block_addr = memory_allocate_pages(PAGE_SIZE);
 
         if (block_addr == 0) {
+            interrupts_restore(pie);
             return 0;
         }
 
@@ -63,29 +68,35 @@ void * allocate(uint32_t size) {
             linked_list_insert(&pool->list, (struct linked_list_node *)chunk_addr); 
         }
 
+        interrupts_restore(pie);
         return block_addr;
     }
 
     struct linked_list_node * chunk = pool->list.head;
 
     linked_list_remove(&pool->list, chunk);
+    interrupts_restore(pie);
 
     return (void *)chunk;
 }
 
 void free(void * block_addr) {
+    uint8_t pie = interrupts_disable();
     struct page * page = memory_page_metadata((uintptr_t)block_addr);
 
     if (page == 0) {
+        interrupts_restore(pie);
         return;
     }
 
     if (page->pool_index == 0xFF) {
         memory_free_pages(block_addr);
+        interrupts_restore(pie);
         return;
     }
 
     struct pool * pool = &pools[page->pool_index];
 
     linked_list_insert(&pool->list, (struct linked_list_node *)block_addr);
+    interrupts_restore(pie);
 }

@@ -23,6 +23,13 @@ enum task_state {
     TASK_STATE_KILLED
 };
 
+struct signal {
+    struct linked_list_node node;
+    uint32_t signum;
+    uint8_t is_pending;
+    void (*handler)();
+};
+
 struct task {
     struct thread {
         uint64_t s[12];
@@ -35,10 +42,10 @@ struct task {
     struct linked_list_node node;
 
     uint32_t pid;
-    uintptr_t kernel_sp;
     uintptr_t kernel_stack_addr;
-    uintptr_t user_sp;
+    uintptr_t kernel_sp;
     uintptr_t user_stack_addr;
+    uintptr_t user_sp;
     enum task_state state;
     
     struct wait_event {
@@ -46,7 +53,11 @@ struct task {
         union task_wait_event_arg arg;
     } wait_event;
 
-    void * arg;
+    void * arg; // TODO: remove this member
+
+    struct linked_list signals_list;
+    uintptr_t signal_stack_addr;
+    uintptr_t signal_sp;
 };
 
 struct trapframe {
@@ -62,5 +73,15 @@ static inline struct task * get_current_task() {
 }
 
 struct task * task_allocate();
+
+void task_free(struct task * task);
+
+struct signal * task_get_next_pending_signal(struct task * task);
+
+void task_register_signal(
+    struct task * task, uint32_t signum, void (*handler)()
+);
+
+struct signal * task_get_signal(struct task * task, uint32_t signum);
 
 struct task * task_copy(struct task * source);

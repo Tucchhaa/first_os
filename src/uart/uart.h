@@ -12,11 +12,11 @@ uint8_t uart_receive_buf_empty();
 
 uint8_t uart_transmit_buf_full();
 
-uint32_t uart_get_bytes(uint8_t * buf, uint32_t n);
+uint32_t uart_get_bytes(char * buf, uint32_t n);
 
 uint32_t uart_put_bytes(const char * buf, uint32_t n);
 
-void uart_put(uint8_t b);
+void uart_put(char b);
 
 void uart_puts(const char * str);
 

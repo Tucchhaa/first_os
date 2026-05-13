@@ -57,7 +57,7 @@ void memory_setup() {
         uart_sync_puts_variadic("[KERNEL] reserve INITRD memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve(initrd_start_addr, initrd_size);
 
-        i64tox(__kernel_start, buf1);
+        i64tox((uint64_t)&__kernel_start, buf1);
         i64tox(kernel_size, buf2);
         uart_sync_puts_variadic("[KERNEL] reserve Kernel memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve((uint64_t)&__kernel_start, kernel_size);

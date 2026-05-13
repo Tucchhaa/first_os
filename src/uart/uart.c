@@ -82,17 +82,6 @@ void uart_irq_handler() {
     }
 }
 
-uint8_t uart_get() {
-    while (rx_head == rx_tail) {
-        asm volatile ("wfi");
-    }
-
-    uint8_t c = rx_ring[rx_tail];
-    rx_tail = (rx_tail + 1) % RX_RING_SIZE;
-
-    return c;
-}
-
 uint8_t uart_receive_buf_empty() {
     return rx_head == rx_tail;
 }
@@ -101,68 +90,112 @@ uint8_t uart_transmit_buf_full() {
     return (tx_head + 1) % TX_RING_SIZE == tx_tail;
 }
 
-uint32_t uart_get_bytes(uint8_t * buf, uint32_t n) {
-    uint32_t i = 0;
-
-    for(; i < n && !uart_receive_buf_empty(); i++) {
-        buf[i] = rx_ring[rx_tail];
-        rx_tail = (rx_tail + 1) % RX_RING_SIZE;
+static uint8_t _uart_get_core(char * c) {
+    if (uart_receive_buf_empty()) {
+        return 0;
     }
 
-    return i;
+    *c = (char)rx_ring[rx_tail];
+    rx_tail = (rx_tail + 1) % RX_RING_SIZE;
+
+    return 1;
 }
 
-void uart_put(uint8_t b) {
+char uart_get() {
+    char c;
+    
     while (1) {
-        uint32_t next = (tx_head + 1) % TX_RING_SIZE;
+        uint8_t pie = interrupts_disable();
+        uint8_t is_ring_drained = _uart_get_core(&c) == 0;
 
-        if (next == tx_tail) {
-            asm volatile("wfi");
+        if (is_ring_drained) {
+            interrupts_restore(pie);
+            cpu_scheduler_wait(TASK_WAIT_UART_READ);
             continue;
         }
 
-        // TODO: it's possible to disable interrupts per string, not per byte
-        uint8_t pie = interrupts_disable();
-
-        tx_ring[tx_head] = b;
-        tx_head = next;
-        *_uart_regs.ier |= UART_IER_THR_EMPTY;
-
-        interrupts_restore(pie);
-
-        return;
+        break;
     }
+
+    return c;
 }
 
-void _uart_put(uint8_t b) {
-    if (uart_transmit_buf_full()) {
-        return;
-    }
-
+uint32_t uart_get_bytes(char * buf, uint32_t n) {
     uint8_t pie = interrupts_disable();
-
-    tx_ring[tx_head] = b;
-    tx_head = (tx_head + 1) % TX_RING_SIZE;
-    *_uart_regs.ier |= UART_IER_THR_EMPTY;
-
-    interrupts_restore(pie);
-}
-
-uint32_t uart_put_bytes(const char * buf, uint32_t count) {
     uint32_t i = 0;
 
-    for (; i < count && !uart_transmit_buf_full(); i++) {
-        if (buf[i] == '\n') _uart_put('\r');
-        _uart_put(buf[i]);
+    for(; i < n; i++) {
+        if (_uart_get_core(&buf[i]) == 0) {
+            break;
+        }
     }
+
+    interrupts_restore(pie);
 
     return i;
 }
 
-void uart_puts(const char * str) {
-    for (uint32_t i = 0; str[i] != '\0'; i++) {
-        if (str[i] == '\n') uart_put('\r');
-        uart_put(str[i]);
+static uint8_t _uart_put_core(char c) {
+    if (uart_transmit_buf_full()) {
+        return 0;
+    }
+
+    tx_ring[tx_head] = (uint8_t)c;
+    tx_head = (tx_head + 1) % TX_RING_SIZE;
+    *_uart_regs.ier |= UART_IER_THR_EMPTY;
+
+    return 1;
+}
+
+void uart_put(char c) {
+    while (1) {
+        uint8_t pie = interrupts_disable();
+        uint8_t result = _uart_put_core(c);
+        interrupts_restore(pie);
+
+        if (result) {
+            return;
+        }
+
+        cpu_scheduler_wait(TASK_WAIT_UART_WRITE);
+    }
+}
+
+uint32_t uart_put_bytes(const char * buf, uint32_t count) {
+    uint8_t pie = interrupts_disable();
+    uint32_t i = 0;
+
+    for (; i < count; i++) {
+        uint8_t ring_drained = 0;
+
+        // TODO: if only one slot left in the ring, it could be undef behavior 
+        if (buf[i] == '\n') {
+            ring_drained |= _uart_put_core('\r') == 0;
+        }
+
+        ring_drained |= _uart_put_core(buf[i]) == 0;
+
+        if (ring_drained) {
+            break;
+        }
+    }
+
+    interrupts_restore(pie);
+    return i;
+}
+
+void uart_puts(const char * buf) {
+    uint32_t count = kstrlen(buf);
+    uint32_t written_count = 0;
+
+    while (1) {
+        written_count += uart_put_bytes(buf + written_count, count - written_count);
+
+        if (written_count == count) {
+            break;
+        }
+
+        cpu_scheduler_wait(TASK_WAIT_UART_WRITE);
     }
 }
 
@@ -184,7 +217,7 @@ uint32_t uart_getline(char * buf, uint32_t n) {
     uint32_t i = 0;
 
     while (i < n - 1) {
-        char c = (char)uart_get();
+        char c = uart_get();
 
         uart_put(c);
 

@@ -1,5 +1,7 @@
 #include "page_allocator.h"
+
 #include "../ds/linked_list.h"
+#include "../interrupts/interrupt_control.h"
 
 // 16GB
 #define MAX_ORDERS 22
@@ -170,6 +172,7 @@ uint8_t memory_init() {
 }
 
 void * memory_allocate_pages(uint64_t size) {
+    uint8_t pie = interrupts_disable();
     uint32_t required_order = 0;
     uint64_t current_size = PAGE_SIZE;
 
@@ -185,6 +188,7 @@ void * memory_allocate_pages(uint64_t size) {
     }
 
     if (order >= MAX_ORDERS) {
+        interrupts_restore(pie);
         return 0;
     }
 
@@ -207,6 +211,7 @@ void * memory_allocate_pages(uint64_t size) {
     page->order = order;
     page->flags = PAGE_FLAG_ALLOCATED;
 
+    interrupts_restore(pie);
     return (void *)block_addr;
 }
 
@@ -228,9 +233,11 @@ static struct linked_list_node * _get_buddy(uintptr_t block_addr, uint8_t order)
 }
 
 void memory_free_pages(void * block_addr) {
+    uint8_t pie = interrupts_disable();
     struct page * page = memory_page_metadata((uintptr_t)block_addr);
 
     if (page == 0) {
+        interrupts_restore(pie);
         return;
     }
 
@@ -255,4 +262,6 @@ void memory_free_pages(void * block_addr) {
     struct page * new_page = memory_page_metadata(new_block_addr);
     new_page->order = order;
     new_page->flags = PAGE_FLAG_FREE;
+
+    interrupts_restore(pie);
 }

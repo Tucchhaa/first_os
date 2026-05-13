@@ -12,6 +12,7 @@
 #include "../task/cpu_scheduler.h"
 #include "../../uart/uart_sync.h"
 #include "../../uart/uart.h"
+#include "../mm/utils.h"
 
 uint8_t is_handling_interrupt = 0;
 
@@ -21,7 +22,9 @@ void set_need_reschedule_cpu() {
     _need_reschedule_cpu = 1; 
 }
 
-void _interrupt_entry();
+extern void _signal_trampoline();
+
+extern void _interrupt_entry();
 
 void interrupt_setup() {
     uart_sync_puts("[KERNEL:INTERRUPTS] Setting up...\n");
@@ -34,6 +37,8 @@ void interrupt_setup() {
 }
 
 void _interrupt_external_handler(void * arg);
+
+void _signal_handler(struct trapframe * trapframe);
 
 static uint8_t _convert_plic_priority(uint8_t plic_priority) {
     const uint8_t PLIC_MAX_PRIORITY = 7;
@@ -104,6 +109,8 @@ void interrupt_handler(struct trapframe * trapframe) {
         _need_reschedule_cpu = 0;
         cpu_scheduler_next();
     }
+
+    _signal_handler(trapframe);
 }
 
 void _interrupt_external_handler(void * arg) {
@@ -115,5 +122,22 @@ void _interrupt_external_handler(void * arg) {
 
     if (irq != 0) {
         plic_complete(irq);
+    }
+}
+
+void _signal_handler(struct trapframe * trapframe) {
+    struct task * task = get_current_task();
+    struct signal * signal = task_get_next_pending_signal(task);
+
+    // Kernel threads should not handle signals
+    if (signal && !(trapframe->sstatus & CSR_SSTATUS_SPP)) {
+        signal->is_pending = 0;
+
+        task->signal_sp -= sizeof(struct trapframe);
+        memcopy((void *)task->signal_sp, trapframe, sizeof(struct trapframe));
+
+        trapframe->sepc = (uint64_t)signal->handler;
+        trapframe->regs[1] = (uint64_t)_signal_trampoline; // set ra reg
+        trapframe->regs[2] = task->signal_sp; // set sp reg
     }
 }

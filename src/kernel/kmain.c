@@ -17,24 +17,6 @@
 #include "task/cpu_scheduler.h"
 #include "../drivers/video/video.h"
 
-void thread_entry() {
-    char a[40], b[40];
-    itoa(get_current_task()->pid, a);
-
-    for (int i = 0; i < 5; i++) {
-        itoa(i, b);
-        
-        uart_puts_variadic("Thread id: ", a, " ", b, "\n", 0);
-
-        for (int j = 0; j < 100000000; j++);
-
-        uart_puts("next\n");
-        cpu_scheduler_next();
-    }
-
-    kthread_exit();
-}
-
 static void kernel_setup(uintptr_t _fdt_addr);
 
 static void kernel_cli();
@@ -48,19 +30,14 @@ TODO:
 - optimize page allocator
 - implement self relocating bootloader
 - support interrupt task preemption
+- rename setup func to init
+- timer is called after a symbol is typed to the user program. Why?
 */
 void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     kernel_setup(_fdt_addr);
 
-    kthread_create(kernel_cli, 0);
-
-    // for (int i=0; i < 3; i++) {
-    //     kthread_create(thread_entry, 0);
-    // }
-    
-    // schedule_timeout(0);
-    
-    // command_exec();
+    struct task * cli_task = kthread_create(kernel_cli, 0);
+    cpu_scheduler_add_task(cli_task);
 
     cpu_scheduler_idle();
 }
@@ -266,11 +243,13 @@ static void command_exec(void) {
         proc_addr[i] = ((char *)file_data)[i];
     }
 
-    char a[40];
+    char a[40], b[40];
     i64tox((uintptr_t)proc_addr, a);
-    uart_sync_puts_variadic("proc_addr: ", a, "\n", 0);
+    i64tox((uintptr_t)proc_addr + data_size, b);
+    uart_puts_variadic("proc_addr: ", a, ", end_addr: ", b, "\n", 0);
 
     struct task * task = kthread_create(kthread_exec_user, proc_addr);
+    cpu_scheduler_add_task(task);
 
     union task_wait_event_arg arg = { .i = task->pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);

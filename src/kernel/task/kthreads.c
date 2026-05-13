@@ -3,9 +3,6 @@
 #include "../mm/dynamic_allocator.h"
 #include "../interrupts/csr.h"
 #include "task.h"
-#include "cpu_scheduler.h"
-
-#include "../../uart/uart.h"
 
 extern void _switch_to_user();
 
@@ -16,8 +13,6 @@ struct task * kthread_create(void (*entry_point)(void), void * arg) {
     // status.spp actaully is not needed here, because kthread is never sret'ed
     task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
     task->arg = arg;
-
-    cpu_scheduler_add_task(task);
 
     return task;
 }
@@ -35,8 +30,4 @@ void kthread_exec_user() {
     csr_sscratch_set((uintptr_t)trapframe);
 
     _switch_to_user();
-}
-
-void kthread_exit() {
-    cpu_scheduler_kill();
 }

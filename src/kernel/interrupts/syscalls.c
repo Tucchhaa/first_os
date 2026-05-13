@@ -1,8 +1,11 @@
 #include "syscalls.h"
 
 #include "../task/task.h"
+#include "../task/task_table.h"
 #include "../task/cpu_scheduler.h"
+#include "../interrupts/interrupt_control.h"
 #include "../mm/dynamic_allocator.h"
+#include "../mm/utils.h"
 #include "../../uart/uart.h"
 #include "../task/kthreads.h"
 #include "../initrd/initrd_parser.h"
@@ -30,13 +33,14 @@ void _syscall_uart_read(struct trapframe * tf) {
     char * buf = (char *)_get_param_by_index(tf, 0);
     uint32_t count = (uint32_t)_get_param_by_index(tf, 1);
 
-    if (uart_receive_buf_empty()) {
+    uint32_t read_count = uart_get_bytes(buf, count);
+
+    if (read_count == 0) {
         tf->sepc -= 4;
         cpu_scheduler_wait(TASK_WAIT_UART_READ);
         return;
     }
 
-    uint32_t read_count = uart_get_bytes(buf, count);
     _syscall_set_result(tf, read_count);
 }
 
@@ -44,16 +48,18 @@ void _syscall_uart_write(struct trapframe * tf) {
     const char * buf = (const char *)_get_param_by_index(tf, 0);
     uint64_t count = (uint64_t)_get_param_by_index(tf, 1);
 
-    if (uart_transmit_buf_full()) {
+    uint32_t write_count = uart_put_bytes(buf, count);
+
+    if (write_count == 0) {
         tf->sepc -= 4;
         cpu_scheduler_wait(TASK_WAIT_UART_WRITE);
         return;
     }
 
-    uint32_t write_count = uart_put_bytes(buf, count);
     _syscall_set_result(tf, write_count);
 }
 
+// TODO: should replace current process memory
 void _syscall_exec(struct trapframe * tf) {
     const char * path = (const char *)_get_param_by_index(tf, 0);
     uintptr_t file_addr = initrd_get_file_addr(path);
@@ -73,6 +79,7 @@ void _syscall_exec(struct trapframe * tf) {
     }
 
     struct task * new_task = kthread_create(kthread_exec_user, proc_addr);
+    cpu_scheduler_add_task(new_task);
 
     union task_wait_event_arg arg = { .i = new_task->pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
@@ -133,6 +140,50 @@ void _syscall_usleep(struct trapframe * tf) {
     _syscall_set_result(tf, 0);
 }
 
+void _syscall_signal(struct trapframe * tf) {
+    uint32_t signum = (uint32_t)_get_param_by_index(tf, 0);
+    void (*handler)() = (void (*)())_get_param_by_index(tf, 1);
+    
+    task_register_signal(get_current_task(), signum, handler);
+
+    _syscall_set_result(tf, 0);
+}
+
+void _syscall_sigreturn(struct trapframe * tf) {
+    struct task * task = get_current_task();
+
+    // Restore the saved trapframe from the signal stack
+    memcopy(tf, (void *)task->signal_sp, sizeof(struct trapframe));
+    task->signal_sp += sizeof(struct trapframe);
+}
+
+void _syscall_kill(struct trapframe * tf) {
+    uint8_t pie = interrupts_disable();
+
+    uint32_t result = 0;
+    uint32_t pid = (uint32_t)_get_param_by_index(tf, 0);
+    uint32_t signum = (uint32_t)_get_param_by_index(tf, 1);
+
+    struct task * task = task_table_get_task(pid);
+
+    if (task == 0) {
+        result = 1;
+    } 
+    else {
+        struct signal * signal = task_get_signal(task, signum);
+
+        if (signal == 0) {
+            result = cpu_scheduler_kill_by_pid(pid);
+        } else {
+            signal->signum = signum;
+            signal->is_pending = 1;
+        }
+    } 
+
+    interrupts_restore(pie);
+    _syscall_set_result(tf, result);
+}
+
 void syscall_handler(void * arg) {
     struct trapframe * tf = (struct trapframe *)arg;
     tf->sepc += 4;
@@ -149,6 +200,9 @@ void syscall_handler(void * arg) {
     case 7: return _syscall_stop(tf);
     case 8: return _syscall_display(tf);
     case 9: return _syscall_usleep(tf);
+    case 10: return _syscall_signal(tf);
+    case 11: return _syscall_sigreturn(tf);
+    case 12: return _syscall_kill(tf);
     default:
         return;
     }
