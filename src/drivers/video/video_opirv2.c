@@ -1,6 +1,7 @@
 #include "video.h"
 
 #include "../../kernel/mm/utils.h"
+#include "../../kernel/vmm/virtual_memory.h"
 
 static uintptr_t fb_base;
 
@@ -9,7 +10,8 @@ static const uint32_t FB_HEIGHT = 1080;
 static const uint32_t CACHE_BLOCK_SIZE = 64;
 
 void video_setup() {
-    fb_base = 0x7f700000;
+    uint64_t fb_size = FB_WIDTH * FB_HEIGHT * sizeof(uint32_t);
+    fb_base = virtual_memory_map_mmio(0x7f700000, fb_size);
 }
 
 #define cbo_flush(start)                \

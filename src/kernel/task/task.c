@@ -5,7 +5,6 @@
 #include "../interrupts/interrupt_control.h"
 
 #define KERNEL_STACK_SIZE 16384
-#define SIGNAL_STACK_SIZE 4096
 
 static uint32_t get_next_pid() {
     uint8_t pie = interrupts_disable();
@@ -32,8 +31,8 @@ struct task * task_allocate() {
     // Init task.signals
     linked_list_init(&task->signals_list);
 
-    task->signal_stack_addr = (uintptr_t)allocate(SIGNAL_STACK_SIZE);
-    task->signal_sp = task->signal_stack_addr + SIGNAL_STACK_SIZE;
+    task->signal_stack_addr = 0;
+    task->signal_sp = 0;
 
     // Init task.trapframe
     task->kernel_sp -= sizeof(struct trapframe);
@@ -61,7 +60,10 @@ struct task * task_allocate() {
 
 void task_free(struct task * task) {
     free((void *)task->kernel_stack_addr);
-    free((void *)task->signal_stack_addr);
+
+    if (task->signal_stack_addr) {
+        free((void *)task->signal_stack_addr);
+    }
 
     struct signal * signal = (struct signal *)task->signals_list.head;
 

@@ -7,6 +7,7 @@
 #include "../../string.h"
 #include "../../converters.h"
 #include "../initrd/initrd.h"
+#include "../vmm/virtual_memory.h"
 #include "page_allocator.h"
 #include "dynamic_allocator.h"
 
@@ -31,6 +32,8 @@ void memory_setup() {
         uint64_t memory_base = 0, memory_size = 0;
 
         fdt_reg_property(memory_node_addr, &memory_base, &memory_size);
+
+        memory_base = pa2va(memory_base);
 
         char buf1[32], buf2[32];
         i64tox(memory_base, buf1);
@@ -57,10 +60,11 @@ void memory_setup() {
         uart_sync_puts_variadic("[KERNEL] reserve INITRD memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
         memory_reserve(initrd_start_addr, initrd_size);
 
-        i64tox((uint64_t)&__kernel_start, buf1);
+        uint64_t kernel_start = (uint64_t)&__kernel_start;
+        i64tox(kernel_start, buf1);
         i64tox(kernel_size, buf2);
         uart_sync_puts_variadic("[KERNEL] reserve Kernel memory. base: 0x", buf1, ", size: 0x", buf2, "\n", 0);
-        memory_reserve((uint64_t)&__kernel_start, kernel_size);
+        memory_reserve(kernel_start, kernel_size);
     }
 
     {
@@ -72,6 +76,8 @@ void memory_setup() {
             while (current_node != 0) {
                 uint64_t address, size;
                 fdt_reg_property(current_node, &address, &size);
+
+                address = pa2va(address);
 
                 char buf1[32], buf2[32];
                 i64tox(address, buf1);
@@ -85,10 +91,11 @@ void memory_setup() {
         }
     }
 
-    if (memory_init() == 0) {
+    if (memory_init()) {
         uart_sync_puts("[KERNEL:ERROR] error occurred during memory init\n");
         return;
     }
+
     dynamic_allocator_init();
 
     uart_sync_puts("[KERNEL] Done setting up memory\n");

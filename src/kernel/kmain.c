@@ -16,8 +16,9 @@
 #include "task/kthreads.h"
 #include "task/cpu_scheduler.h"
 #include "../drivers/video/video.h"
+#include "vmm/virtual_memory.h"
 
-static void kernel_setup(uintptr_t _fdt_addr);
+static void kernel_setup(uint64_t _fdt_addr);
 
 static void kernel_cli();
 
@@ -32,8 +33,17 @@ TODO:
 - support interrupt task preemption
 - rename setup func to init
 - timer is called after a symbol is typed to the user program. Why?
+- Free program code memory after task has completed (memleak)
+- move uart and plic to drivers directory
+- bug on opirv2, after a process is killed, 'exec' command doesn't work 
+- since vm is used, the same linker script can be used for kernel
 */
-void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
+void kmain(
+    uint64_t _hartid, 
+    uintptr_t _fdt_addr, 
+    uint64_t _virtual_kernel_offset
+) {
+    virtual_kernel_offset = _virtual_kernel_offset;
     kernel_setup(_fdt_addr);
 
     struct task * cli_task = kthread_create(kernel_cli, 0);
@@ -42,16 +52,15 @@ void kmain(uint64_t _hartid, uintptr_t _fdt_addr) {
     cpu_scheduler_idle();
 }
 
-static void kernel_setup(uintptr_t _fdt_addr) {
-    if (fdt_setup(_fdt_addr) == 0) {
+static void kernel_setup(uint64_t _fdt_addr) {
+    virtual_memory_drop_identity_mapping();
+    
+    if (fdt_setup(pa2va(_fdt_addr))) {
         return;
     }
 
     sbi_setup();
-    uart_sync_setup();
-
-    // char a[5];
-    // uart_sync_getline(a, 2);
+    uart_sync_setup(); 
 
     uart_sync_puts("[KERNEL:INITRD] Setting up...\n");
     if (initrd_setup()) {
@@ -196,7 +205,6 @@ static void command_ls(void) {
 
 static void command_cat(const char * command) {
     const char * file_name = &command[4];
-    uint32_t file_name_len = kstrlen(file_name);
 
     uintptr_t file_addr = initrd_start_addr;
 
@@ -204,7 +212,7 @@ static void command_cat(const char * command) {
         uint32_t path_size;
         const char * filepath = initrd_get_filepath(file_addr, &path_size);
 
-        if (streqln(file_name, filepath, file_name_len)) {
+        if (streqln(file_name, filepath, path_size)) {
             uint32_t data_size;
             uintptr_t data = initrd_get_filedata(file_addr, &data_size);
 

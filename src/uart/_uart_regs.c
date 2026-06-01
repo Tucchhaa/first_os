@@ -1,12 +1,21 @@
 #include "_uart_regs.h"
 
-#include "../fdt/fdt_parser.h"
+#include "../fdt/fdt.h"
+
+#if defined(KERNEL)
+#include "../kernel/vmm/virtual_memory.h"
+#endif
 
 struct uart_regs uart_get_regs(uintptr_t serial_node) {
-    uintptr_t uart_addr;
-    fdt_reg_property(serial_node, &uart_addr, (void*)0);
+    uintptr_t uart_addr, uart_size;
+    fdt_reg_property(serial_node, &uart_addr, &uart_size);
 
     struct uart_regs result;
+
+    #if defined(KERNEL)
+    uart_addr = virtual_memory_map_mmio(uart_addr, uart_size);
+    #endif
+
     result.base = (uint8_t *)uart_addr;
 
     if (fdt_node_is_compatible(serial_node, "ns16550a")) {

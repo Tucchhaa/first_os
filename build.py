@@ -88,6 +88,7 @@ class Project:
             cmd = [COMPILER]
             cmd += ["-march=rv64gc_zicbom", "-O2", "-ffreestanding", "-nostdlib"]
             cmd += ["-c", "-mcmodel=medany", f"-DPLATFORM_{self.platform.upper()}"] 
+            cmd += ["-DBOOTLOADER"] if self.name == "bootloader" else ["-DKERNEL"]
             cmd += [c_file, "-o", out_path]
 
             execute(cmd)
@@ -204,6 +205,7 @@ class Kernel(Project):
             "src/kernel/mm/page_allocator.c",
             "src/kernel/mm/dynamic_allocator.c",
             "src/kernel/mm/utils.c",
+            "src/kernel/vmm/virtual_memory.c",
             "src/kernel/interrupts/interrupt_entry.S",
             "src/kernel/interrupts/signal_trampoline.S",
             "src/kernel/interrupts/interrupt_handler.c",

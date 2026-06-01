@@ -4,6 +4,7 @@
 #include "../../fdt/fdt.h"
 #include "../../string.h"
 #include "../../converters.h"
+#include "../vmm/virtual_memory.h"
 
 static uint32_t _hart_ctx = 1;
 static uintptr_t _plic_addr;
@@ -34,7 +35,9 @@ void plic_setup() {
         return;
     }
 
-    fdt_reg_property(plic_node, &_plic_addr, (void *)0);
+    uintptr_t plic_size;
+    fdt_reg_property(plic_node, &_plic_addr, &plic_size);
+    _plic_addr = virtual_memory_map_mmio(_plic_addr, plic_size);
     *plic_threshold_reg(_hart_ctx) = 0;
 
     char buf[40];

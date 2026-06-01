@@ -2,33 +2,34 @@ ENTRY(_start)
 
 MEMORY
 {
-  RAM (rwx) : ORIGIN = 0x82000000, LENGTH = 16M
+  /* 0x2000000 is offset where bootloader places kernel */
+  VRAM (rwx) : ORIGIN = 0xFFFFFFC002000000, LENGTH = 16M
 }
 
 SECTIONS
 {
-    . = ORIGIN(RAM);
+    . = ORIGIN(VRAM);
     __kernel_start = .;
 
     .text : { 
         *(.text.init)
         *(.text*) 
-    } > RAM
+    }
 
     .rodata : { 
         *(.rodata*) 
-    } > RAM
+    }
 
     .data : { 
         *(.data*) 
-    } > RAM
+    }
 
     .bss : { 
         __bss_start = .;
         *(.sbss*) *(.bss*)
         __bss_end = .; 
-    } > RAM
+    }
 
-    __stack_top = ORIGIN(RAM) + LENGTH(RAM);
+    __stack_top = ORIGIN(VRAM) + LENGTH(VRAM);
     __kernel_end = __stack_top;
 }

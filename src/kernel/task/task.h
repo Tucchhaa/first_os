@@ -4,6 +4,8 @@
 
 #include "../ds/linked_list.h"
 
+#define SIGNAL_STACK_SIZE 4096
+
 union task_wait_event_arg {
     uint32_t i;
 };

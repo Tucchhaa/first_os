@@ -5,7 +5,8 @@
 #include "../../kernel/mm/page_allocator.h"
 #include "../../kernel/mm/utils.h"
 #include "../../kernel/mm/dynamic_allocator.h"
-#include "../../fdt/fdt_parser.h"
+#include "../../kernel/vmm/virtual_memory.h"
+#include "../../fdt/fdt.h"
 #include "../../string.h"
 #include "../../uart/uart_sync.h"
 #include "../../converters.h"
@@ -73,10 +74,10 @@ static void fw_cfg_dma_transfer(
     volatile struct FWCfgDmaAccess access = {
         .control = bswap32(control),
         .length = bswap32(length),
-        .address = bswap64((uint64_t)address),
+        .address = bswap64(va2pa((uint64_t)address)),
     };
 
-    *regs.dma = bswap64((uint64_t)&access);
+    *regs.dma = bswap64(va2pa((uint64_t)&access));
 
     while (bswap32(access.control) & ~FW_CFG_DMA_CTL_ERROR);
 
@@ -136,15 +137,17 @@ static void flush_dcache(void * addr, uint64_t len) {
 }
 
 void video_setup() {
-    uint64_t fw_cfg_base;
+    uint64_t fw_cfg_base, fw_cfg_size;
 
     uintptr_t node = fdt_node_addr_by_compatible("qemu,fw-cfg-mmio");
-    fdt_reg_property(node, &fw_cfg_base, (void *)0);
+    fdt_reg_property(node, &fw_cfg_base, &fw_cfg_size);
 
     if (fw_cfg_base == 0) {
         uart_sync_puts("[KERNEL:VIDEO]: no compatible device was found.\n");
         return;
     }
+
+    fw_cfg_base = virtual_memory_map_mmio(fw_cfg_base, fw_cfg_size);
 
     regs.select = (volatile uint16_t *)(fw_cfg_base + 0x08);
     regs.data = (volatile uint64_t *)(fw_cfg_base + 0x00);
@@ -154,7 +157,7 @@ void video_setup() {
     fb_base = (uintptr_t)allocate(fb_size);
 
     struct RAMFBCfg cfg = {
-        .addr = bswap64(fb_base),
+        .addr = bswap64(va2pa(fb_base)),
         .fourcc = bswap32(XRGB8888),
         .flags = bswap32(0),
         .width = bswap32(FB_WIDTH),

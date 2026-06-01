@@ -1,3 +1,3 @@
 #pragma once
 
-#define KERNEL_LOAD_ADDR 0x82000000
+#define KERNEL_PHYSICAL_ADDR 0x82000000

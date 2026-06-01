@@ -20,7 +20,7 @@ static uint32_t available_memory_max_length = 10;
 static struct memory_region available_memory[10];
 
 static uint32_t reserved_memory_length = 0;
-static uint32_t reserved_memory_max_length = 10;
+static uint32_t reserved_memory_max_length = 100;
 static struct memory_region reserved_memory[100];
 
 static uint32_t frame_array_length = 0;
@@ -139,7 +139,7 @@ uint8_t memory_init() {
     uintptr_t frame_array_addr = _allocate_frame_array(frame_array_size);
 
     if (frame_array_addr == 0) {
-        return 0;
+        return 1;
     }
 
     memory_base_addr = available_memory[0].addr;
@@ -151,7 +151,7 @@ uint8_t memory_init() {
         frame_array[i].order = 0;
         frame_array[i].pool_index = 0;
     }
-    
+
     _memory_reserve_pages(frame_array_addr, frame_array_size);
 
     for (uint32_t i = 0; i < reserved_memory_length; i += 1) {
@@ -168,7 +168,7 @@ uint8_t memory_init() {
 
     _populate_orders_lists();
 
-    return 1;
+    return 0;
 }
 
 void * memory_allocate_pages(uint64_t size) {

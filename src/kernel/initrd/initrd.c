@@ -3,6 +3,8 @@
 #include "../../fdt/fdt.h"
 #include "../../converters.h"
 
+#include "../vmm/virtual_memory.h"
+
 uintptr_t initrd_start_addr;
 uintptr_t initrd_end_addr;
 
@@ -17,6 +19,9 @@ uint8_t initrd_setup() {
 
     initrd_start_addr = be64_to_cpu(*(uint64_t *)(&initrd_start_prop->data));
     initrd_end_addr = be64_to_cpu(*(uint64_t *)(&initrd_end_prop->data));
+
+    initrd_start_addr = pa2va(initrd_start_addr);
+    initrd_end_addr = pa2va(initrd_end_addr);
 
     if (initrd_check_magic(initrd_start_addr) == 0) {
         return 0;

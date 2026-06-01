@@ -5,7 +5,7 @@
 uint64_t hartid;
 
 static void receive_kernel_bin(int kernel_size) {
-    const uintptr_t KERNEL_ADDR = KERNEL_LOAD_ADDR;
+    const uintptr_t KERNEL_ADDR = KERNEL_PHYSICAL_ADDR;
     uint32_t loaded_bytes_count = 0;
 
     while (loaded_bytes_count < kernel_size) {
@@ -44,7 +44,7 @@ static void cli(void) {
 void bootloader(uint64_t _hartid, uintptr_t _fdt_addr) {
     hartid = _hartid;
 
-    if (fdt_setup(_fdt_addr) == 0) {
+    if (fdt_setup(_fdt_addr)) {
         return;
     }
 

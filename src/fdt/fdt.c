@@ -11,12 +11,12 @@ static uint8_t _fdt_check_magic(uintptr_t fdt) {
 
 uint8_t fdt_setup(uintptr_t _fdt_addr) {
     if (_fdt_check_magic(_fdt_addr) == 0) {
-        return 0;
+        return 1;
     }
 
     fdt_addr = _fdt_addr;
 
-    return 1;
+    return 0;
 }
 
 struct fdt_header * fdt_header() {

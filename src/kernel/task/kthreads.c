@@ -19,6 +19,10 @@ struct task * kthread_create(void (*entry_point)(void), void * arg) {
 
 void kthread_exec_user() {
     struct task * current_task = get_current_task();
+
+    current_task->signal_stack_addr = (uintptr_t)allocate(SIGNAL_STACK_SIZE);
+    current_task->signal_sp = current_task->signal_stack_addr + SIGNAL_STACK_SIZE;
+
     struct trapframe * trapframe = (struct trapframe *)current_task->thread.sscratch;
     trapframe->sepc = (uint64_t)current_task->arg;
     trapframe->sstatus = CSR_SSTATUS_SPIE;
