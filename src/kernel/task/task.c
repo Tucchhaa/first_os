@@ -56,24 +56,24 @@ struct task * task_create() {
     return task;
 }
 
-void _task_add_user_mapping(
+static void _task_add_user_mapping(
     struct task * task,
     uint64_t vaddr, uint64_t kernel_vaddr,
-    uint64_t size, uint8_t flags
+    uint64_t size, uint8_t prot
 ) {
     struct user_mapping * mapping = (struct user_mapping *)allocate(sizeof(struct user_mapping));
     mapping->node.next = mapping->node.prev = 0;
     mapping->vaddr = vaddr;
     mapping->kernel_vaddr = kernel_vaddr;
     mapping->size = size;
-    mapping->flags = flags;
+    mapping->prot = prot;
 
     linked_list_insert(&task->user_mappings, &mapping->node);
 
     virtual_memory_map(
         task->pgd,
         vaddr, va2pa(kernel_vaddr),
-        size, flags
+        size, prot
     );
 }
 
@@ -115,19 +115,19 @@ struct task * task_create_user(const char * filepath) {
     _task_add_user_mapping(
         task, 
         USER_PROGRAM_VADDR, (uint64_t)user_program,
-        data_size, PTE_USER_CODE_FLAGS
+        data_size, PTE_USER_CODE_PROT
     );
 
     _task_add_user_mapping(
         task, 
         USER_STACK_VADDR, (uint64_t)allocate(USER_STACK_SIZE),
-        USER_STACK_SIZE, PTE_USER_STACK_FLAGS
+        USER_STACK_SIZE, PTE_USER_STACK_PROT
     );
 
     _task_add_user_mapping(
         task, 
         SIGNAL_STACK_VADDR, (uint64_t)allocate(SIGNAL_STACK_SIZE),
-        SIGNAL_STACK_SIZE, PTE_USER_STACK_FLAGS
+        SIGNAL_STACK_SIZE, PTE_USER_STACK_PROT
     );
     }
 
@@ -144,6 +144,14 @@ struct task * task_create_user(const char * filepath) {
     }
 
     return task;
+}
+
+static inline uintptr_t _rebase_kstack_addr(
+    struct task * task,
+    struct task * source,
+    uintptr_t source_addr
+) {
+    return task->kernel_stack_addr + (source_addr - source->kernel_stack_addr);
 }
 
 struct task * task_copy(struct task * source) {
@@ -184,7 +192,7 @@ struct task * task_copy(struct task * source) {
         _task_add_user_mapping(
             task,
             src_mapping->vaddr, (uint64_t)new_pages,
-            src_mapping->size, src_mapping->flags
+            src_mapping->size, src_mapping->prot
         );
 
         src_mapping = (struct user_mapping *)src_mapping->node.next;
@@ -306,12 +314,4 @@ struct signal * task_get_next_pending_signal(struct task * task) {
     }
 
     return 0;
-}
-
-static inline uintptr_t _rebase_kstack_addr(
-    struct task * task,
-    struct task * source,
-    uintptr_t source_addr
-) {
-    return task->kernel_stack_addr + (source_addr - source->kernel_stack_addr);
 }

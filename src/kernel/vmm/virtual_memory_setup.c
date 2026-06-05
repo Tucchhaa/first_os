@@ -37,11 +37,11 @@ uint8_t virtual_memory_setup(uintptr_t fdt_addr) {
         uint64_t pgd_paddr = memory_base + offset;
         uint64_t pgd_vaddr = KERNEL_VIRTUAL_BASE + offset;
 
-        kernel_pgd[get_pgd_index(pgd_paddr)] = make_pte(pgd_paddr, PTE_IDENTITY_FLAGS);
-        kernel_pgd[get_pgd_index(pgd_vaddr)] = make_pte(pgd_paddr, PTE_KERNEL_FLAGS);
+        kernel_pgd[get_pgd_index(pgd_paddr)] = make_pte(pgd_paddr, PTE_IDENTITY_PROT);
+        kernel_pgd[get_pgd_index(pgd_vaddr)] = make_pte(pgd_paddr, PTE_KERNEL_PROT);
     }
     // TODO: needed for uart
-    kernel_pgd[0] = make_pte(0, PTE_MMIO_FLAGS);
+    kernel_pgd[0] = make_pte(0, PTE_MMIO_PROT);
 
     virtual_mmio_offset = KERNEL_VIRTUAL_BASE + offset;
 
@@ -71,7 +71,7 @@ void virtual_memory_refine_mappings() {
         kernel_vaddr_start, 
         kernel_paddr_start, 
         kernel_size, 
-        PTE_KERNEL_FLAGS
+        PTE_KERNEL_PROT
     );
 
     if (kernel_paddr_start > memory_base) {
@@ -80,7 +80,7 @@ void virtual_memory_refine_mappings() {
             KERNEL_VIRTUAL_BASE,
             memory_base,
             kernel_paddr_start - memory_base,
-            PTE_RAM_FLAGS
+            PTE_RAM_PROT
         );
     }
 
@@ -93,7 +93,7 @@ void virtual_memory_refine_mappings() {
             KERNEL_VIRTUAL_BASE + after_offset,
             kernel_paddr_end,
             memory_paddr_end - kernel_paddr_end,
-            PTE_RAM_FLAGS
+            PTE_RAM_PROT
         );
     }
 

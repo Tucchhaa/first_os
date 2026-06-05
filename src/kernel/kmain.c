@@ -62,6 +62,8 @@ TODO:
 - bug on opirv2, after a process is killed, 'exec' command doesn't work 
 - since vm is used, the same linker script can be used for kernel
 - implement print()
+- load ramdisk with kernel, not with bootloader
+- use uint64_t instead of uintptr_t
 */
 void kmain(
     uint64_t _hartid, 

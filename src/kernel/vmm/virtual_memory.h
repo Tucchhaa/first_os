@@ -17,7 +17,7 @@ void virtual_memory_map(
     uint64_t vaddr, 
     uint64_t paddr,
     uint64_t size, 
-    uint64_t flags
+    uint64_t prot
 );
 
 void virtual_memory_map_pmd(
@@ -25,7 +25,7 @@ void virtual_memory_map_pmd(
     uint64_t vaddr, 
     uint64_t paddr,
     uint64_t size, 
-    uint64_t flags
+    uint64_t prot
 );
 
 uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size);

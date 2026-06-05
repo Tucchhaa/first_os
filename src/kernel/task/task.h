@@ -35,7 +35,7 @@ struct user_mapping {
     uint64_t vaddr;
     uint64_t kernel_vaddr;
     uint64_t size;
-    uint8_t flags;
+    uint8_t prot;
 };
 
 struct task {

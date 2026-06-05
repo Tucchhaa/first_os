@@ -25,19 +25,19 @@ static const uint8_t PTE_GLOBAL = (1 << 5);
 static const uint8_t PTE_ACCESSED = (1 << 6);
 static const uint8_t PTE_DIRTY = (1 << 7);
 
-static const uint8_t PTE_IDENTITY_FLAGS = 
+static const uint8_t PTE_IDENTITY_PROT = 
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_EXECUTE | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_RAM_FLAGS = 
+static const uint8_t PTE_RAM_PROT = 
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_MMIO_FLAGS = 
+static const uint8_t PTE_MMIO_PROT = 
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_GLOBAL | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_KERNEL_FLAGS = 
+static const uint8_t PTE_KERNEL_PROT = 
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_GLOBAL | PTE_EXECUTE | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_USER_CODE_FLAGS =
+static const uint8_t PTE_USER_CODE_PROT =
     PTE_VALID | PTE_READ | PTE_EXECUTE | PTE_USER | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_USER_STACK_FLAGS =
+static const uint8_t PTE_USER_STACK_PROT =
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_USER | PTE_ACCESSED | PTE_DIRTY;
 
-static inline uint64_t make_pte(uint64_t paddr, uint8_t flags) {
-    return ((paddr >> 12) << 10) | flags;
+static inline uint64_t make_pte(uint64_t paddr, uint8_t prot) {
+    return ((paddr >> 12) << 10) | prot;
 }

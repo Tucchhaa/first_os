@@ -32,7 +32,7 @@ static void pagewalk(
     uint64_t * pgd,
     uint64_t vaddr, 
     uint64_t paddr, 
-    uint64_t flags,
+    uint64_t prot,
     uint32_t leaf_level
 ) {
     uint64_t * current_table = pgd;
@@ -52,7 +52,7 @@ static void pagewalk(
 
     uint64_t index = (vaddr >> (12 + 9 * leaf_level)) & 0x1FF;
 
-    current_table[index] = make_pte(paddr, flags);
+    current_table[index] = make_pte(paddr, prot);
 }
 
 void virtual_memory_map(
@@ -60,10 +60,10 @@ void virtual_memory_map(
     uint64_t vaddr, 
     uint64_t paddr,
     uint64_t size, 
-    uint64_t flags
+    uint64_t prot
 ) {
     for (uint64_t offset = 0; offset < size; offset += pte_mem_size) {
-        pagewalk(pgd, vaddr + offset, paddr + offset, flags, 0);
+        pagewalk(pgd, vaddr + offset, paddr + offset, prot, 0);
     }
 }
 
@@ -72,10 +72,10 @@ void virtual_memory_map_pmd(
     uint64_t vaddr, 
     uint64_t paddr,
     uint64_t size, 
-    uint64_t flags
+    uint64_t prot
 ) {
     for (uint64_t offset = 0; offset < size; offset += pmd_mem_size) {
-        pagewalk(pgd, vaddr + offset, paddr + offset, flags, 1);
+        pagewalk(pgd, vaddr + offset, paddr + offset, prot, 1);
     }
 }
 
@@ -88,7 +88,7 @@ uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size) {
             kernel_pgd, 
             result_vaddr + offset, 
             mmio_paddr + offset, 
-            PTE_MMIO_FLAGS, 
+            PTE_MMIO_PROT, 
             0
         );
 
