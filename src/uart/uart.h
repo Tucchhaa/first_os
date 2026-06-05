@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+extern uint8_t uart_ready;
 extern uint32_t uart_irq;
 
 void uart_setup();

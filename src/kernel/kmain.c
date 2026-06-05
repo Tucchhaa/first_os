@@ -16,6 +16,7 @@
 #include "task/kthreads.h"
 #include "task/cpu_scheduler.h"
 #include "../drivers/video/video.h"
+#include "vmm/virtual_memory_setup.h"
 #include "vmm/virtual_memory.h"
 
 static void kernel_setup(uint64_t _fdt_addr);
@@ -23,6 +24,29 @@ static void kernel_setup(uint64_t _fdt_addr);
 static void kernel_cli();
 
 static void schedule_timeout(void *);
+
+void thread_entry() {
+    char a[40], b[40];
+    itoa(get_current_task()->pid, a);
+
+    for (int i = 0; i < 5; i++) {
+        itoa(i, b);
+
+        uart_puts_variadic("Thread id: ", a, " ", b, "\n", 0);
+
+        for (int j = 0; j < 100000000; j++);
+
+        uart_puts("next\n");
+        cpu_scheduler_next();
+    }
+
+    cpu_scheduler_kill();
+}
+
+void aboba (void *) {
+    uart_puts("kernel is live\n");
+    set_timeout(aboba, 0, 3000000);
+}
 
 /*
 TODO:
@@ -37,45 +61,45 @@ TODO:
 - move uart and plic to drivers directory
 - bug on opirv2, after a process is killed, 'exec' command doesn't work 
 - since vm is used, the same linker script can be used for kernel
+- implement print()
 */
 void kmain(
     uint64_t _hartid, 
     uintptr_t _fdt_addr, 
     uint64_t _virtual_kernel_offset
 ) {
-    virtual_kernel_offset = _virtual_kernel_offset;
+    set_virtual_kernel_offset(_virtual_kernel_offset);
     kernel_setup(_fdt_addr);
 
-    struct task * cli_task = kthread_create(kernel_cli, 0);
+    struct task * cli_task = kthread_create(kernel_cli);
     cpu_scheduler_add_task(cli_task);
+
+    // for (int i=0; i < 3; i++) {
+    //     struct task * task = kthread_create(thread_entry);
+    //     cpu_scheduler_add_task(task);
+    // }
+
+    aboba(0);
 
     cpu_scheduler_idle();
 }
 
 static void kernel_setup(uint64_t _fdt_addr) {
-    virtual_memory_drop_identity_mapping();
-    
     if (fdt_setup(pa2va(_fdt_addr))) {
         return;
     }
 
-    sbi_setup();
-    uart_sync_setup(); 
+    // Note: setup UART at physical addr for debugging
+    uart_sync_setup();
 
-    uart_sync_puts("[KERNEL:INITRD] Setting up...\n");
-    if (initrd_setup()) {
-        char buf[40];
-        i64tox(initrd_start_addr, buf);
-        uart_sync_puts_variadic("[KERNEL:INITRD] initrd-start addr: 0x", buf, "\n", 0);
-
-        i64tox(initrd_end_addr, buf);
-        uart_sync_puts_variadic("[KERNEL:INITRD] initrd-end addr: 0x", buf, "\n", 0);
-    } else {
-        uart_sync_puts("[KERNEL:INITRD] Could not setup initrd. Probably initramfs is not passed\n");
-    }
-    uart_sync_puts("\n");
-
+    initrd_setup();
     memory_setup();
+
+    // virtual_memory_drop_identity_mapping();
+    virtual_memory_refine_mappings();
+    uart_sync_setup();
+
+    sbi_setup();
     video_setup();
     interrupt_setup();
     plic_setup();
@@ -179,10 +203,10 @@ static void command_ls(void) {
         uint32_t path_size;
         const char * filepath = initrd_get_filepath(file_addr, &path_size);
 
-        uint32_t file_data_size;
-        initrd_get_filedata(file_addr, &file_data_size);
+        uint32_t data_size;
+        initrd_get_filedata(file_addr, 0, &data_size);
 
-        itoa(file_data_size, buf);
+        itoa(data_size, buf);
         uart_puts(buf);
 
         int32_t space_count = 8 - kstrlen(buf);
@@ -213,8 +237,9 @@ static void command_cat(const char * command) {
         const char * filepath = initrd_get_filepath(file_addr, &path_size);
 
         if (streqln(file_name, filepath, path_size)) {
+            uintptr_t data;
             uint32_t data_size;
-            uintptr_t data = initrd_get_filedata(file_addr, &data_size);
+            initrd_get_filedata(file_addr, &data, &data_size);
 
             for (int i=0; i < data_size; i++) {
                 char c = ((char *)data)[i];
@@ -234,30 +259,14 @@ static void command_cat(const char * command) {
 }
 
 static void command_exec(void) {
-    uintptr_t file_addr = initrd_get_file_addr("./osctest.bin");
-    // uintptr_t file_addr = initrd_get_file_addr("./prog.bin");
+    struct task * task = task_create_user("./osctest.bin");
 
-    if (file_addr == 0) {
-        uart_puts("Could not find user program\n");
+    if (task == 0) {
+        uart_puts("Could\'t create task\n");
         return;
     }
 
-    uint32_t data_size;
-    uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
-
-    char * proc_addr = allocate(data_size);
-
-    for (uintptr_t i = 0; i < data_size; i += 1) {
-        proc_addr[i] = ((char *)file_data)[i];
-    }
-
-    char a[40], b[40];
-    i64tox((uintptr_t)proc_addr, a);
-    i64tox((uintptr_t)proc_addr + data_size, b);
-    uart_puts_variadic("proc_addr: ", a, ", end_addr: ", b, "\n", 0);
-
-    struct task * task = kthread_create(kthread_exec_user, proc_addr);
-    cpu_scheduler_add_task(task);
+    kthread_exec_user(task);
 
     union task_wait_event_arg arg = { .i = task->pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);

@@ -1,37 +1,29 @@
 #include "kthreads.h"
 
-#include "../mm/dynamic_allocator.h"
 #include "../interrupts/csr.h"
 #include "task.h"
+#include "cpu_scheduler.h"
 
 extern void _switch_to_user();
 
-struct task * kthread_create(void (*entry_point)(void), void * arg) {
-    struct task * task = task_allocate();
-    task->wait_event.id = TASK_WAIT_NONE;
+struct task * kthread_create(void (*entry_point)(void)) {
+    struct task * task = task_create();
+
     task->thread.ra = (uint64_t)entry_point;
-    // status.spp actaully is not needed here, because kthread is never sret'ed
-    task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
-    task->arg = arg;
+    // status.spp actually is not needed here, because kthread is never sret'ed
+    task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP | CSR_SSTATUS_SUM;
 
     return task;
 }
 
-void kthread_exec_user() {
-    struct task * current_task = get_current_task();
+void kthread_exec_user(struct task * task) {
+    struct trapframe * trapframe = (struct trapframe *)task->thread.sscratch;
 
-    current_task->signal_stack_addr = (uintptr_t)allocate(SIGNAL_STACK_SIZE);
-    current_task->signal_sp = current_task->signal_stack_addr + SIGNAL_STACK_SIZE;
+    task->thread.ra = (uint64_t)_switch_to_user;
+    task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
 
-    struct trapframe * trapframe = (struct trapframe *)current_task->thread.sscratch;
-    trapframe->sepc = (uint64_t)current_task->arg;
-    trapframe->sstatus = CSR_SSTATUS_SPIE;
-    trapframe->regs[2] = current_task->kernel_sp; // set sp reg
-    // TODO: user process should not have access to struct task
-    trapframe->regs[4] = (uint64_t)current_task; // set tp reg
-    // TODO: set ra reg, to make exit syscall
+    // TODO: sstatus.SUM allows user pointer dereference, which can be exploited
+    trapframe->sstatus = CSR_SSTATUS_SPIE | CSR_SSTATUS_SUM;
 
-    csr_sscratch_set((uintptr_t)trapframe);
-
-    _switch_to_user();
+    cpu_scheduler_add_task(task);
 }

@@ -13,7 +13,9 @@ struct uart_regs uart_get_regs(uintptr_t serial_node) {
     struct uart_regs result;
 
     #if defined(KERNEL)
-    uart_addr = virtual_memory_map_mmio(uart_addr, uart_size);
+    if (virtual_memory_ready) {
+        uart_addr = virtual_memory_map_mmio(uart_addr, uart_size);
+    }
     #endif
 
     result.base = (uint8_t *)uart_addr;

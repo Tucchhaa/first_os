@@ -68,10 +68,13 @@ static void _interrupt_get_handler(
         *arg = (void *)((uint64_t)plic_claim());
         *handler = &_interrupt_external_handler;
         break;
-    default:
+    case 8: // U-mode ecall
         *priority = 1;
         *arg = trapframe;
         *handler = &syscall_handler;
+        break;
+    default:
+        // TODO: panic
         break;
     }
 }
@@ -129,8 +132,7 @@ void _signal_handler(struct trapframe * trapframe) {
     struct task * task = get_current_task();
     struct signal * signal = task_get_next_pending_signal(task);
 
-    // Kernel threads should not handle signals
-    if (signal && !(trapframe->sstatus & CSR_SSTATUS_SPP)) {
+    if (signal) {
         signal->is_pending = 0;
 
         task->signal_sp -= sizeof(struct trapframe);

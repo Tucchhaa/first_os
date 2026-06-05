@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include "../../kernel/mm/page_allocator.h"
 #include "../../kernel/mm/utils.h"
 #include "../../kernel/mm/dynamic_allocator.h"
 #include "../../kernel/vmm/virtual_memory.h"
@@ -111,24 +110,17 @@ static int32_t fw_cfg_find_file(const char* name) {
     return -1;
 }
 
-#define cbo_flush(start)                            \
-    ({                                              \
-        uint64_t __v = (uint64_t)(start); \
-        __asm__ __volatile__(                       \
-            "cbo.flush"                             \
-            " 0(%0)"                                \
-            :                                       \
-            : "rK"(__v)                             \
-            : "memory");                            \
-    })
+static inline void cbo_flush(uint64_t start) {
+    asm volatile ("cbo.flush 0(%0)" :: "r"(start) : "memory");
+}
 
-static void flush_dcache(void * addr, uint64_t len) {
-    uint64_t start = (uint64_t)addr & ~(CACHE_BLOCK_SIZE - 1);
+static void flush_dcache(uint64_t addr, uint64_t len) {
+    uint64_t start = addr & ~(CACHE_BLOCK_SIZE - 1);
     __sync_synchronize();
 
     for (
         uint64_t line = start; 
-        line < (uint64_t)addr + len;
+        line < addr + len;
         line += CACHE_BLOCK_SIZE
     ) {
         cbo_flush(line);
@@ -181,6 +173,9 @@ void video_bmp_display(uint32_t * bmp_image, uint32_t width, uint32_t height) {
         void * dst = fb + (start_y + y) * FB_WIDTH + start_x;
 
         memcopy(dst, bmp_image + y * width, width * sizeof(uint32_t));
-        flush_dcache(dst, width * sizeof(uint32_t));
+        __sync_synchronize();
+
+        // TODO: no need on qemu
+        // flush_dcache(dst_addr, width * sizeof(uint32_t));
     }
 }

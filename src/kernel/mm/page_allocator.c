@@ -31,7 +31,6 @@ static struct linked_list orders_lists[MAX_ORDERS];
 static uintptr_t memory_base_addr;
 
 static inline uint32_t _get_page_index(uintptr_t page_addr) {
-    // TODO: convert to bit operation
     return (page_addr - memory_base_addr) / PAGE_SIZE;
 }
 

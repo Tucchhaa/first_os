@@ -39,7 +39,7 @@ void cpu_scheduler_init() {
     bootstrap.state = TASK_STATE_KILLED;
     set_current_task(&bootstrap);
 
-    idle_task = kthread_create(cpu_scheduler_idle, 0);
+    idle_task = kthread_create(cpu_scheduler_idle);
     cpu_scheduler_add_task(idle_task);
 }
 
@@ -76,7 +76,6 @@ static uint8_t _task_wait_arg_matches(struct task * task, void * arg) {
     return task->wait_event.arg.i == (uint32_t)((uint64_t)arg);
 }
 
-// TODO: merge kill functions into one
 static void _cpu_scheduler_kill_core(struct task * task) {
     uint8_t pie = interrupts_disable();
     task->state = TASK_STATE_KILLED;

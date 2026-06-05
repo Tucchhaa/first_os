@@ -11,11 +11,12 @@
 #include "../kernel/interrupts/interrupt_control.h"
 #include "../kernel/task/cpu_scheduler.h"
 
-#define RX_RING_SIZE 512
-#define TX_RING_SIZE 512
+#define RX_RING_SIZE 5120
+#define TX_RING_SIZE 5120
 
 static struct uart_regs _uart_regs;
 
+uint8_t uart_ready = 0;
 uint32_t uart_irq = 0;
 
 static volatile uint8_t rx_ring[RX_RING_SIZE];
@@ -42,6 +43,8 @@ void uart_setup() {
         uart_irq = be32_to_cpu(*(uint32_t *)(&irq_prop->data));
         plic_enable_irq(uart_irq, 1);
     }
+
+    uart_ready = 1;
 }
 
 void uart_irq_handler() {

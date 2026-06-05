@@ -4,8 +4,6 @@
 
 #include "../ds/linked_list.h"
 
-#define SIGNAL_STACK_SIZE 4096
-
 union task_wait_event_arg {
     uint32_t i;
 };
@@ -32,6 +30,14 @@ struct signal {
     void (*handler)();
 };
 
+struct user_mapping {
+    struct linked_list_node node;
+    uint64_t vaddr;
+    uint64_t kernel_vaddr;
+    uint64_t size;
+    uint8_t flags;
+};
+
 struct task {
     struct thread {
         uint64_t s[12];
@@ -39,27 +45,27 @@ struct task {
         uint64_t sp;
         uint64_t sscratch;
         uint64_t sstatus;
+        uint64_t satp;
     } thread;
 
     struct linked_list_node node;
 
     uint32_t pid;
-    uintptr_t kernel_stack_addr;
-    uintptr_t kernel_sp;
-    uintptr_t user_stack_addr;
-    uintptr_t user_sp;
+    uint64_t * pgd;
+
     enum task_state state;
-    
     struct wait_event {
         enum task_wait_event_id id;
         union task_wait_event_arg arg;
     } wait_event;
 
-    void * arg; // TODO: remove this member
-
-    struct linked_list signals_list;
-    uintptr_t signal_stack_addr;
+    uintptr_t kernel_stack_addr;
+    uintptr_t kernel_sp;
     uintptr_t signal_sp;
+
+    uint8_t is_user;
+    struct linked_list signals_list;
+    struct linked_list user_mappings;
 };
 
 struct trapframe {
@@ -74,11 +80,13 @@ static inline struct task * get_current_task() {
     return result;
 }
 
-struct task * task_allocate();
+struct task * task_create();
+
+struct task * task_create_user(const char * path);
+
+struct task * task_copy(struct task * source);
 
 void task_free(struct task * task);
-
-struct signal * task_get_next_pending_signal(struct task * task);
 
 void task_register_signal(
     struct task * task, uint32_t signum, void (*handler)()
@@ -86,4 +94,5 @@ void task_register_signal(
 
 struct signal * task_get_signal(struct task * task, uint32_t signum);
 
-struct task * task_copy(struct task * source);
+struct signal * task_get_next_pending_signal(struct task * task);
+

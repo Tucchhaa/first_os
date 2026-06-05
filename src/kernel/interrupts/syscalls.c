@@ -11,6 +11,8 @@
 #include "../initrd/initrd_parser.h"
 #include "../../drivers/video/video.h"
 
+#include "../../converters.h"
+
 extern void _switch_to_user();
 
 static inline uint64_t _get_syscall_id(struct trapframe * tf) {
@@ -59,27 +61,17 @@ void _syscall_uart_write(struct trapframe * tf) {
     _syscall_set_result(tf, write_count);
 }
 
-// TODO: should replace current process memory
+// TODO: should replace task's memory
 void _syscall_exec(struct trapframe * tf) {
     const char * path = (const char *)_get_param_by_index(tf, 0);
-    uintptr_t file_addr = initrd_get_file_addr(path);
 
-    if (file_addr == 0) {
+    struct task * new_task = task_create_user(path);
+    if (new_task == 0) {
         _syscall_set_result(tf, -1);
         return;
     }
 
-    uint32_t data_size;
-    uintptr_t file_data = initrd_get_filedata(file_addr, &data_size);
-
-    char * proc_addr = allocate(data_size); // todo: memory leak
-
-    for (uintptr_t i = 0; i < data_size; i += 1) {
-        proc_addr[i] = ((char *)file_data)[i];
-    }
-
-    struct task * new_task = kthread_create(kthread_exec_user, proc_addr);
-    cpu_scheduler_add_task(new_task);
+    kthread_exec_user(new_task);
 
     union task_wait_event_arg arg = { .i = new_task->pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
@@ -115,6 +107,8 @@ void _syscall_exit(struct trapframe * tf) {
     uint32_t status = (uint32_t)_get_param_by_index(tf, 0);
 
     cpu_scheduler_kill();
+
+    _syscall_set_result(tf, 1);
 }
 
 void _syscall_stop(struct trapframe * tf) {

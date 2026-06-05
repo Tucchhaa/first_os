@@ -5,8 +5,8 @@
 
 #include "../vmm/virtual_memory.h"
 
-uintptr_t initrd_start_addr;
-uintptr_t initrd_end_addr;
+uintptr_t initrd_start_addr = 0;
+uintptr_t initrd_end_addr = 0;
 
 uint8_t initrd_setup() {
     uintptr_t chosen_node = fdt_node_addr_by_path("/chosen");

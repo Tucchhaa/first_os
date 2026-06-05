@@ -205,6 +205,8 @@ class Kernel(Project):
             "src/kernel/mm/page_allocator.c",
             "src/kernel/mm/dynamic_allocator.c",
             "src/kernel/mm/utils.c",
+            "src/kernel/vmm/definitions.c",
+            "src/kernel/vmm/virtual_memory_setup.c",
             "src/kernel/vmm/virtual_memory.c",
             "src/kernel/interrupts/interrupt_entry.S",
             "src/kernel/interrupts/signal_trampoline.S",

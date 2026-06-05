@@ -36,20 +36,23 @@ const char * initrd_get_filepath(uintptr_t file_addr, uint32_t * path_size) {
     return (const char *)(file_addr + sizeof(struct cpio_newc_header));
 }
 
-uintptr_t initrd_get_filedata(uintptr_t file_addr, uint32_t * file_size) {
+void initrd_get_filedata(uintptr_t file_addr, uintptr_t * data, uint32_t * data_size) {
     if (initrd_check_magic(file_addr) == 0) {
-        return 0;
+        if (data != 0) *data = 0;
+        if (data_size != 0) *data_size = 0;
+        return;
     }
 
     struct cpio_newc_header * header = (struct cpio_newc_header *)file_addr;
     uint32_t name_size = xtoi32(header->c_namesize);
 
-    *file_size = xtoi32(header->c_filesize);
-
     uintptr_t addr = file_addr + sizeof(struct cpio_newc_header) + name_size;
     addr = (addr + 3) & ~3;
 
-    return addr;
+    if (data != 0) *data = addr;
+    if (data_size != 0) *data_size = xtoi32(header->c_filesize);
+
+    return;
 }
 
 uintptr_t initrd_get_next_file_addr(uintptr_t file_addr) {

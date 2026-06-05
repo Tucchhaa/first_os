@@ -25,6 +25,9 @@ _switch_to_kernel:
   csrr t0, sstatus
   sd   t0, 120(a0)
 
+  csrr t0, satp
+  sd t0, 128(a0)
+
   # --- [RESTORE NEXT CPU STATE] ---
   ld s0, 0(a1)
   ld s1, 8(a1)
@@ -48,6 +51,10 @@ _switch_to_kernel:
 
   ld   t0, 120(a1)
   csrw sstatus, t0
+
+  ld t0, 128(a1)
+  csrw satp, t0
+  sfence.vma zero, zero
 
   # --- [EXECUTE NEXT THREAD] --
   ret

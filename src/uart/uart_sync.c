@@ -9,7 +9,7 @@ static struct uart_regs _uart_regs;
 
 void uart_sync_setup() {
     uintptr_t serial_node = fdt_node_addr_by_path("/soc/serial");
-    
+
     _uart_regs = uart_get_regs(serial_node);
 
     uart_sync_puts("[KERNEL:UART] Done setting up\n");
