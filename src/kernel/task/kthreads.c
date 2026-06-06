@@ -4,7 +4,7 @@
 #include "task.h"
 #include "cpu_scheduler.h"
 
-extern void _switch_to_user();
+extern void switch_to_user();
 
 struct task * kthread_create(void (*entry_point)(void)) {
     struct task * task = task_create();
@@ -19,7 +19,7 @@ struct task * kthread_create(void (*entry_point)(void)) {
 void kthread_exec_user(struct task * task) {
     struct trapframe * trapframe = (struct trapframe *)task->thread.sscratch;
 
-    task->thread.ra = (uint64_t)_switch_to_user;
+    task->thread.ra = (uint64_t)switch_to_user;
     task->thread.sstatus = CSR_SSTATUS_SIE | CSR_SSTATUS_SPP;
 
     // TODO: sstatus.SUM allows user pointer dereference, which can be exploited

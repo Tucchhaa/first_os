@@ -1,8 +1,8 @@
 .section ".text"
-.globl _switch_to_kernel
+.globl switch_to_kernel
 .p2align 2
 
-_switch_to_kernel:
+switch_to_kernel:
   # --- [SAVE CURRENT CPU STATE] ---
   sd s0,  0(a0)
   sd s1,  8(a0)

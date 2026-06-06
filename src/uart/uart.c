@@ -11,8 +11,8 @@
 #include "../kernel/interrupts/interrupt_control.h"
 #include "../kernel/task/cpu_scheduler.h"
 
-#define RX_RING_SIZE 5120
-#define TX_RING_SIZE 5120
+#define RX_RING_SIZE 512
+#define TX_RING_SIZE 512
 
 static struct uart_regs _uart_regs;
 
@@ -45,6 +45,29 @@ void uart_setup() {
     }
 
     uart_ready = 1;
+}
+
+void uart_debug_puts(const char * s) {
+    uint8_t pie = interrupts_disable();
+
+    // drain TX ring first so output stays ordered
+    while (tx_head != tx_tail) {
+        while (!uart_status_thre(&_uart_regs)) { }
+        *_uart_regs.base = tx_ring[tx_tail];
+        tx_tail = (tx_tail + 1) % TX_RING_SIZE;
+    }
+
+    for (; *s; s++) {
+        if (*s == '\n') {
+            while (!uart_status_thre(&_uart_regs)) { }
+            *_uart_regs.base = '\r';
+        }
+
+        while (!uart_status_thre(&_uart_regs)) { }
+        *_uart_regs.base = *s;
+    }
+
+    interrupts_restore(pie);
 }
 
 void uart_irq_handler() {

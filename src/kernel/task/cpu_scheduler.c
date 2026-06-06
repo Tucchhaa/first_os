@@ -23,7 +23,7 @@ static struct task * idle_task;
 static const uint32_t time_quantum = 31250; // 31250 usec = 1/32 sec
 static uint32_t timeout_id;
 
-extern void _switch_to_kernel(struct task * prev, struct task * next);
+extern void switch_to_kernel(struct task * prev, struct task * next);
 
 static inline void set_current_task(struct task * task) {
     asm volatile ("mv tp, %0" :: "r"(task) :);
@@ -76,30 +76,7 @@ static uint8_t _task_wait_arg_matches(struct task * task, void * arg) {
     return task->wait_event.arg.i == (uint32_t)((uint64_t)arg);
 }
 
-static void _cpu_scheduler_kill_core(struct task * task) {
-    uint8_t pie = interrupts_disable();
-    task->state = TASK_STATE_KILLED;
-
-    linked_list_insert(&killed_queue, &task->node);
-    interrupts_restore(pie);
-
-    cpu_scheduler_fire_cond(
-        TASK_WAIT_PROCESS_KILL, 
-        _task_wait_arg_matches, 
-        (void *)((uint64_t)task->pid)
-    );
-}
-
-void cpu_scheduler_kill() {
-    _cpu_scheduler_kill_core(get_current_task());
-    cpu_scheduler_next();
-}
-
 uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
-    if (pid == get_current_task()->pid) {
-        return 1;
-    }
-
     uint8_t pie = interrupts_disable();
 
     struct task * task = task_table_get_task(pid);
@@ -116,10 +93,27 @@ uint8_t cpu_scheduler_kill_by_pid(uint32_t pid) {
         linked_list_remove(&waiting_queue, &task->node);
     }
 
+    task->state = TASK_STATE_KILLED;
+    linked_list_insert(&killed_queue, &task->node);
+
+    cpu_scheduler_fire_cond(
+        TASK_WAIT_PROCESS_KILL, 
+        _task_wait_arg_matches, 
+        (void *)((uint64_t)task->pid)
+    );
+
+    uint8_t is_self = (pid == get_current_task()->pid);
     interrupts_restore(pie);
-    _cpu_scheduler_kill_core(task);
+
+    if (is_self) {
+        cpu_scheduler_next();
+    }
 
     return 0;
+}
+
+void cpu_scheduler_kill() {
+    cpu_scheduler_kill_by_pid(get_current_task()->pid);
 }
 
 void cpu_scheduler_wait(uint32_t event_id) {
@@ -218,7 +212,7 @@ void cpu_scheduler_next() {
     linked_list_remove(&ready_queue, &next->node);
     interrupts_restore(pie);
 
-    _switch_to_kernel(prev, next);
+    switch_to_kernel(prev, next);
 }
 
 void cpu_scheduler_idle() {

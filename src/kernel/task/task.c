@@ -33,11 +33,11 @@ struct task * task_create() {
     task->wait_event.id = TASK_WAIT_NONE;
 
     task->kernel_stack_addr = (uintptr_t)allocate(KERNEL_STACK_SIZE);
-    task->kernel_sp = task->kernel_stack_addr + KERNEL_STACK_SIZE;
+    task->kernel_stack_top = task->kernel_stack_addr + KERNEL_STACK_SIZE;
 
     // Init task.trapframe
-    task->kernel_sp -= sizeof(struct trapframe);
-    struct trapframe * trapframe = (struct trapframe *)task->kernel_sp;
+    task->kernel_stack_top -= sizeof(struct trapframe);
+    struct trapframe * trapframe = (struct trapframe *)task->kernel_stack_top;
 
     for (uint32_t i=0; i < 32; i++) {
         trapframe->regs[i] = 0;
@@ -48,7 +48,7 @@ struct task * task_create() {
 
     // Init task.thread
     task->thread.ra = 0;
-    task->thread.sp = task->kernel_sp;
+    task->thread.sp = task->kernel_stack_top;
     task->thread.sscratch = (uint64_t)trapframe;
     task->thread.sstatus = 0;
     task->thread.satp = get_satp_value(va2pa((uint64_t)kernel_pgd));
@@ -154,6 +154,7 @@ static inline uintptr_t _rebase_kstack_addr(
     return task->kernel_stack_addr + (source_addr - source->kernel_stack_addr);
 }
 
+// TODO: doesn't work with kernel tasks
 struct task * task_copy(struct task * source) {
     struct task * task = allocate(sizeof(struct task));
     memzero(task, sizeof(struct task));
@@ -175,8 +176,13 @@ struct task * task_copy(struct task * source) {
     // Kernel stack
     {
     task->kernel_stack_addr = (uintptr_t)allocate(KERNEL_STACK_SIZE);
-    task->kernel_sp = _rebase_kstack_addr(task, source, source->kernel_sp);
-    memcopy((void *)task->kernel_stack_addr, (void *)source->kernel_stack_addr, KERNEL_STACK_SIZE);
+    task->kernel_stack_top = task->kernel_stack_addr + KERNEL_STACK_SIZE - sizeof(struct trapframe);
+
+    memcopy(
+        (void *)task->kernel_stack_top, 
+        (void *)source->kernel_stack_top,
+        sizeof(struct trapframe)
+    );
     }
 
     // User mappings
@@ -220,9 +226,10 @@ struct task * task_copy(struct task * source) {
 
     // Copy task.thread
     {
+    // TODO: rewritten by fork()
     task->thread.ra = source->thread.ra;
-    task->thread.sp = task->kernel_sp;
-    task->thread.sscratch = _rebase_kstack_addr(task, source, source->thread.sscratch);
+    task->thread.sp = task->kernel_stack_top;
+    task->thread.sscratch = task->kernel_stack_top;
     task->thread.sstatus = source->thread.sstatus;
     task->thread.satp = get_satp_value(va2pa((uint64_t)task->pgd));
 

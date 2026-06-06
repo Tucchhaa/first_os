@@ -54,6 +54,12 @@ _interrupt_entry:
   csrw sscratch, t0
 
   # --- [JUMP TO TRAP HANDLER] ---
+  csrr t1, sstatus
+  andi t1, t1, 0x100   # SPP
+  bnez t1, 1f          # came from S-mode, keep current sp
+  ld sp, 144(tp)       # came from U-mode, load kernel_stack_top
+1:
+
   mv a0, t0
   call interrupt_handler
 

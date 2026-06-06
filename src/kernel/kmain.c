@@ -81,7 +81,7 @@ void kmain(
     //     cpu_scheduler_add_task(task);
     // }
 
-    aboba(0);
+    // aboba(0);
 
     cpu_scheduler_idle();
 }
@@ -97,7 +97,7 @@ static void kernel_setup(uint64_t _fdt_addr) {
     initrd_setup();
     memory_setup();
 
-    // virtual_memory_drop_identity_mapping();
+    virtual_memory_drop_identity_mapping();
     virtual_memory_refine_mappings();
     uart_sync_setup();
 

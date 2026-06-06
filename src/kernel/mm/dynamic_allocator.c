@@ -9,8 +9,8 @@ struct pool {
     struct linked_list list;
 };
 
-# define POOLS_SIZE 9
-static uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 48, 96, 128, 256, 512, 1024, 2048 };
+# define POOLS_SIZE 8
+static uint32_t chunk_sizes[POOLS_SIZE] = { 16, 32, 64, 128, 256, 512, 1024, 2048 };
 static struct pool pools[POOLS_SIZE];
 
 void dynamic_allocator_init(void) {

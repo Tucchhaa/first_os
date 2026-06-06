@@ -80,8 +80,6 @@ static void _interrupt_get_handler(
 }
 
 void interrupt_handler(struct trapframe * trapframe) {
-    static uint8_t is_tasks_executing = 0;
-
     void (*handler)(void *);
     uint8_t priority;
     void * arg;
@@ -89,12 +87,11 @@ void interrupt_handler(struct trapframe * trapframe) {
 
     interrupt_tasks_add(handler, arg, priority);
 
-    if (is_tasks_executing) {
+    if (is_handling_interrupt) {
         return;
     }
 
     is_handling_interrupt = 1;
-    is_tasks_executing = 1;
 
     struct trapframe nested_trapframe;
     csr_sscratch_set((uintptr_t)&nested_trapframe);
@@ -105,7 +102,6 @@ void interrupt_handler(struct trapframe * trapframe) {
 
     csr_sscratch_set((uintptr_t)trapframe);
 
-    is_tasks_executing = 0;
     is_handling_interrupt = 0;
 
     if (_need_reschedule_cpu) {

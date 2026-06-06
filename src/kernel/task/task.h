@@ -48,6 +48,9 @@ struct task {
         uint64_t satp;
     } thread;
 
+    uintptr_t kernel_stack_addr;
+    uintptr_t kernel_stack_top;
+
     struct linked_list_node node;
 
     uint32_t pid;
@@ -59,8 +62,6 @@ struct task {
         union task_wait_event_arg arg;
     } wait_event;
 
-    uintptr_t kernel_stack_addr;
-    uintptr_t kernel_sp;
     uintptr_t signal_sp;
 
     uint8_t is_user;

@@ -13,7 +13,7 @@
 
 #include "../../converters.h"
 
-extern void _switch_to_user();
+extern void switch_to_user();
 
 static inline uint64_t _get_syscall_id(struct trapframe * tf) {
     return tf->regs[17];
@@ -82,7 +82,7 @@ void _syscall_exec(struct trapframe * tf) {
 void _syscall_fork(struct trapframe * tf) {
     struct task * current_task = get_current_task();
     struct task * child_task = task_copy(current_task);
-    child_task->thread.ra = (uint64_t)_switch_to_user;
+    child_task->thread.ra = (uint64_t)switch_to_user;
 
     cpu_scheduler_add_task(child_task);
 

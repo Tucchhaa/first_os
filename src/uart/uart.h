@@ -7,6 +7,8 @@ extern uint32_t uart_irq;
 
 void uart_setup();
 
+void uart_debug_puts(const char * s);
+
 void uart_irq_handler(void);
 
 uint8_t uart_receive_buf_empty();

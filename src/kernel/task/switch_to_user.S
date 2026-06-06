@@ -1,8 +1,8 @@
 .section ".text"
-.globl _switch_to_user
+.globl switch_to_user
 .p2align 2
 
-_switch_to_user:
+switch_to_user:
   # --- [RESTORE CPU STATE] ---
   csrrw t0, sscratch, t0
 
