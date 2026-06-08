@@ -29,3 +29,5 @@ void virtual_memory_map_pmd(
 );
 
 uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size);
+
+void virtual_memory_flush();

@@ -85,6 +85,12 @@ static inline uint64_t csr_scause_get() {
     return value;
 }
 
+static inline uint64_t csr_stval_get() {
+    uint64_t value;
+    asm volatile ("csrr %0, stval" : "=r" (value));
+    return value;
+}
+
 static inline void csr_sret() {
     asm volatile ("sret");
 }

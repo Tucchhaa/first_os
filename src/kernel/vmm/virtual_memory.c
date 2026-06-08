@@ -65,6 +65,9 @@ void virtual_memory_map(
     for (uint64_t offset = 0; offset < size; offset += pte_mem_size) {
         pagewalk(pgd, vaddr + offset, paddr + offset, prot, 0);
     }
+
+    // TOOD: why in virtual_memory_map_pmd it causes a stall?
+
 }
 
 void virtual_memory_map_pmd(
@@ -95,7 +98,11 @@ uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size) {
         next_vaddr += pte_mem_size;
     }
 
-    asm volatile ("sfence.vma zero, zero" ::: "memory");
+    virtual_memory_flush();
 
     return result_vaddr;
+}
+
+void virtual_memory_flush() {
+    asm volatile ("sfence.vma zero, zero" ::: "memory");
 }

@@ -99,5 +99,5 @@ void virtual_memory_refine_mappings() {
 
     virtual_memory_ready = 1;
 
-    asm volatile ("sfence.vma zero, zero" ::: "memory");
+    virtual_memory_flush();
 }

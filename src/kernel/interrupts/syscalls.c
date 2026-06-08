@@ -1,6 +1,8 @@
 #include "syscalls.h"
 
 #include "../task/task.h"
+#include "../task/task_mapping.h"
+#include "../task/task_signal.h"
 #include "../task/task_table.h"
 #include "../task/cpu_scheduler.h"
 #include "../interrupts/interrupt_control.h"
@@ -178,6 +180,35 @@ void _syscall_kill(struct trapframe * tf) {
     _syscall_set_result(tf, result);
 }
 
+void _syscall_mmap(struct trapframe * tf) {
+    uintptr_t vaddr = (uintptr_t)_get_param_by_index(tf, 0);
+    uintptr_t size = (uintptr_t)_get_param_by_index(tf, 1);
+    uint32_t user_prot = (uint32_t)_get_param_by_index(tf, 2);
+    uint32_t flags = (uint32_t)_get_param_by_index(tf, 3);
+
+    // Note: if RWX is not set to PTE, MMU will treat it as non-leaf entry
+    if (size == 0 || user_prot == PROT_NONE) {
+        _syscall_set_result(tf, (uint64_t)-1);
+        return;
+    }
+
+    uint8_t pie = interrupts_disable();
+    struct mapping * mapping = task_add_mapping(
+        get_current_task(),
+        vaddr, size, 
+        get_mapping_prot(user_prot), flags
+    );
+
+    if (mapping == 0) {
+        _syscall_set_result(tf, (uint64_t)-1);
+        return;
+    }
+
+    interrupts_restore(pie);
+    
+    _syscall_set_result(tf, mapping->vaddr);
+}
+
 void syscall_handler(void * arg) {
     struct trapframe * tf = (struct trapframe *)arg;
     tf->sepc += 4;
@@ -197,6 +228,7 @@ void syscall_handler(void * arg) {
     case 10: return _syscall_signal(tf);
     case 11: return _syscall_sigreturn(tf);
     case 12: return _syscall_kill(tf);
+    case 13: return _syscall_mmap(tf);
     default:
         return;
     }

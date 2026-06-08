@@ -41,3 +41,7 @@ static const uint8_t PTE_USER_STACK_PROT =
 static inline uint64_t make_pte(uint64_t paddr, uint8_t prot) {
     return ((paddr >> 12) << 10) | prot;
 }
+
+static inline uint64_t align_to_pte(uint64_t addr) {
+    return (addr + pte_mem_size - 1) & ~(pte_mem_size - 1);
+}
