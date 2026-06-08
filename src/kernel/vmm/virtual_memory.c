@@ -3,7 +3,7 @@
 #include "../../fdt/fdt.h"
 #include "../../string.h"
 #include "../../platform.h"
-#include "../mm/dynamic_allocator.h"
+#include "../mm/page_allocator.h"
 #include "../mm/utils.h"
 #include "definitions.h"
 
@@ -26,6 +26,17 @@ uint64_t pa2va(uint64_t physical_addr) {
     return physical_addr + virtual_kernel_offset;
 }
 
+static inline uint64_t * pte_to_table_vaddr(uint64_t pte) {
+    // bits 10..53
+    const uint64_t PTE_PPN_MASK = ((1ULL << 44) - 1) << 10; 
+    uint64_t paddr = ((pte & PTE_PPN_MASK) >> 10) << 12;
+    return (uint64_t *)pa2va(paddr);
+}
+
+static inline uint8_t is_leaf_pte(uint64_t pte) {
+    return (pte & (PTE_READ | PTE_WRITE | PTE_EXECUTE)) != 0;
+}
+
 // leaf_level=0 - maps a 4KiB page
 // leaf_level=1 - maps a 2MiB page
 static void pagewalk(
@@ -41,13 +52,14 @@ static void pagewalk(
         uint64_t index = (vaddr >> (12 + 9 * level)) & 0x1FF;
         uint64_t * entry = &current_table[index];
 
+        // TODO: entry is leaf only when refining kernel memory
         if (*entry == 0 || (*entry & (PTE_READ | PTE_WRITE | PTE_EXECUTE))) {
-            void * table = allocate(sizeof(uint64_t) * PAGE_TABLE_ENTRIES_NUM);
+            void * table = memory_allocate_pages(sizeof(uint64_t) * PAGE_TABLE_ENTRIES_NUM);
             memzero(table, sizeof(uint64_t) * PAGE_TABLE_ENTRIES_NUM);
             *entry = make_pte(va2pa((uint64_t)table), PTE_VALID);
         }
 
-        current_table = (uint64_t *)pa2va((*entry >> 10) << 12);
+        current_table = pte_to_table_vaddr(*entry);
     }
 
     uint64_t index = (vaddr >> (12 + 9 * leaf_level)) & 0x1FF;
@@ -65,9 +77,6 @@ void virtual_memory_map(
     for (uint64_t offset = 0; offset < size; offset += pte_mem_size) {
         pagewalk(pgd, vaddr + offset, paddr + offset, prot, 0);
     }
-
-    // TOOD: why in virtual_memory_map_pmd it causes a stall?
-
 }
 
 void virtual_memory_map_pmd(
@@ -105,4 +114,22 @@ uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size) {
 
 void virtual_memory_flush() {
     asm volatile ("sfence.vma zero, zero" ::: "memory");
+}
+
+void virtual_memory_free_tables(uint64_t * table, uint32_t start_index, uint32_t n) {
+    for (uint32_t i = start_index; i < start_index + n; i += 1) {
+        uint64_t pte = table[i];
+
+        if (pte == 0 || is_leaf_pte(pte)) {
+            table[i] = 0;
+            continue;
+        }
+
+        uint64_t * sub_table = pte_to_table_vaddr(pte);
+
+        virtual_memory_free_tables(sub_table, 0, PAGE_TABLE_ENTRIES_NUM);
+        memory_free_pages((void *)sub_table);
+
+        table[i] = 0;
+    }
 }

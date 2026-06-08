@@ -176,3 +176,13 @@ void task_copy_mappings(struct task * dest, struct task * source) {
     );
 }
 
+void task_free_mappings(struct task * task) {
+    struct mapping * current = (struct mapping *)task->mappings.head;
+
+    while(current) {
+        struct mapping * next = (struct mapping *)current->node.next; 
+        free((void *)current->kernel_vaddr);
+        free(current);
+        current = next;
+    }
+}

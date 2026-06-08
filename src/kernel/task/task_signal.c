@@ -66,3 +66,13 @@ struct signal * task_get_next_pending_signal(struct task * task) {
 
     return 0;
 }
+
+void task_free_signals(struct task * task) {
+    struct signal * current = (struct signal *)task->signals_list.head;
+
+    while (current) {
+        struct signal * next = (struct signal *)current->node.next;
+        free(current);
+        current = next;
+    }
+}

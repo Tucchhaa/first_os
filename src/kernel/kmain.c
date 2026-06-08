@@ -261,14 +261,16 @@ static void command_cat(const char * command) {
 }
 
 static void command_exec(void) {
-    struct task * task = task_create_user("./osctest.bin");
-
-    if (task == 0) {
+    struct task * task = task_create();
+    
+    if (task_exec_user(task, "./osctest.bin")) {
+        task_free(task);
         uart_puts("Could\'t create task\n");
         return;
     }
 
-    kthread_exec_user(task);
+    // kthread_exec_user(task);
+    cpu_scheduler_add_task(task);
 
     union task_wait_event_arg arg = { .i = task->pid };
     cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);

@@ -31,3 +31,5 @@ void virtual_memory_map_pmd(
 uintptr_t virtual_memory_map_mmio(uintptr_t mmio_paddr, uint64_t size);
 
 void virtual_memory_flush();
+
+void virtual_memory_free_tables(uint64_t * pgd, uint32_t start_index, uint32_t n);

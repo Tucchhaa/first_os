@@ -39,3 +39,5 @@ struct mapping * task_add_mapping(
 void task_create_user_mappings(struct task * task, void * code, uint64_t code_size);
 
 void task_copy_mappings(struct task * dest, struct task * source);
+
+void task_free_mappings(struct task * task);

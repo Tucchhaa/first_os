@@ -12,6 +12,7 @@
 #include "../task/kthreads.h"
 #include "../initrd/initrd_parser.h"
 #include "../../drivers/video/video.h"
+#include "../vmm/virtual_memory.h"
 
 #include "../../converters.h"
 
@@ -63,22 +64,16 @@ void _syscall_uart_write(struct trapframe * tf) {
     _syscall_set_result(tf, write_count);
 }
 
-// TODO: should replace task's memory
 void _syscall_exec(struct trapframe * tf) {
     const char * path = (const char *)_get_param_by_index(tf, 0);
+    struct task * task = get_current_task();
 
-    struct task * new_task = task_create_user(path);
-    if (new_task == 0) {
+    if (task_exec_user(task, path)) {
         _syscall_set_result(tf, -1);
         return;
     }
 
-    kthread_exec_user(new_task);
-
-    union task_wait_event_arg arg = { .i = new_task->pid };
-    cpu_scheduler_wait_arg(TASK_WAIT_PROCESS_KILL, arg);
-
-    _syscall_set_result(tf, 0);
+    virtual_memory_flush();
 }
 
 void _syscall_fork(struct trapframe * tf) {

@@ -68,6 +68,8 @@ static inline struct task * get_current_task() {
 
 struct task * task_create();
 
+uint8_t task_exec_user(struct task * task, const char * filepath);
+
 struct task * task_create_user(const char * path);
 
 struct task * task_copy(struct task * source);

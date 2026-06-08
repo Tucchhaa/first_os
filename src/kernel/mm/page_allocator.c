@@ -170,6 +170,7 @@ uint8_t memory_init() {
     return 0;
 }
 
+// TODO: rename to allocate_pages
 void * memory_allocate_pages(uint64_t size) {
     uint8_t pie = interrupts_disable();
     uint32_t required_order = 0;

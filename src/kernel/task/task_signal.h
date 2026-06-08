@@ -22,3 +22,5 @@ void task_register_signal(
 struct signal * task_get_signal(struct task * task, uint32_t signum);
 
 struct signal * task_get_next_pending_signal(struct task * task);
+
+void task_free_signals(struct task * task);

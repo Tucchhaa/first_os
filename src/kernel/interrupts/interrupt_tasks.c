@@ -33,6 +33,7 @@ void interrupt_tasks_add(
     new_entry->arg = arg;
     new_entry->priority = priority;
 
+    // TODO: can override pending tasks
     tasks_buffer_head = (tasks_buffer_head + 1) % TASKS_BUFFER_SIZE;
 
     struct interrupt_task * current_entry = (struct interrupt_task *)tasks_queue.head;
