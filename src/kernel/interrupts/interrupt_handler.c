@@ -15,6 +15,9 @@
 #include "../../uart/uart_sync.h"
 #include "../../uart/uart.h"
 #include "../mm/utils.h"
+#include "../mm/page_allocator.h"
+#include "../vmm/definitions.h"
+#include "../vmm/virtual_memory.h"
 
 #include "../../converters.h"
 
@@ -41,6 +44,8 @@ void interrupt_setup() {
 static void _interrupt_external_handler(void * arg);
 
 static void _signal_handler(struct trapframe * trapframe);
+
+static void _page_fault_handler();
 
 static uint8_t _convert_plic_priority(uint8_t plic_priority) {
     const uint8_t PLIC_MAX_PRIORITY = 7;
@@ -79,13 +84,11 @@ static void _interrupt_get_handler(
         *arg = trapframe;
         *handler = &syscall_handler;
         break;
-    case 0xd: // Segmentation fault
-        uart_debug_puts("[SEGMENTATION FAULT]: kill process\n");
-        *handler = &_default_fault_handler;
-        break;
+    case 0xc: // page faults
+    case 0xd:
     case 0xf:
-        uart_debug_puts("[PERMISSIONS FAULT]: kill process\n");
-        *handler = &_default_fault_handler;
+        _page_fault_handler();
+        *handler = 0;
         break;
     default:
         uart_debug_puts("KERNEL PANIC!!!\n");
@@ -99,6 +102,10 @@ void interrupt_handler(struct trapframe * trapframe) {
     uint8_t priority;
     void * arg;
     _interrupt_get_handler(&handler, &arg, &priority, trapframe);
+
+    if (handler == 0) {
+        return;
+    }
 
     interrupt_tasks_add(handler, arg, priority);
 
@@ -124,7 +131,10 @@ void interrupt_handler(struct trapframe * trapframe) {
         cpu_scheduler_next();
     }
 
+    struct trapframe sig_nested_tf;
+    csr_sscratch_set((uintptr_t)&sig_nested_tf);
     _signal_handler(trapframe);
+    csr_sscratch_set((uintptr_t)trapframe);
 }
 
 static void _interrupt_external_handler(void * arg) {
@@ -154,4 +164,42 @@ static void _signal_handler(struct trapframe * trapframe) {
         trapframe->regs[2] = task->signal_sp; // set sp reg
         trapframe->regs[10] = signal->signum;
     }
+}
+
+static void _page_fault_handler() {
+    uint64_t scause = csr_scause_get();
+    uint64_t vaddr  = csr_stval_get();
+
+    vaddr = align_to_floor_pte(vaddr);
+
+    uint8_t need_x = (scause == 0xc);
+    uint8_t need_r = (scause == 0xd);
+    uint8_t need_w = (scause == 0xf);
+
+    struct task * task = get_current_task();
+    struct mapping * mapping = task_find_mapping(task, vaddr);
+
+    if (mapping == 0) {
+        uart_debug_puts("[SEGMENTATION FAULT]: Kill process\n");
+        cpu_scheduler_kill();
+        return;
+    }
+    if (
+        (need_x && !(mapping->prot & PTE_EXECUTE))
+        || (need_w && !(mapping->prot & PTE_WRITE))
+        || (need_r && !(mapping->prot & PTE_READ))
+    ) {
+        uart_debug_puts("[PERMISSION FAULT]: Kill process\n");
+        cpu_scheduler_kill();
+        return;
+    }
+
+    char a[40];
+    i64tox(vaddr, a);
+    uart_debug_puts("[TRANSLATION FAULT]: ");
+    uart_debug_puts(a);
+    uart_debug_puts("\n");
+
+    task_install_page(task, mapping, vaddr);
+    virtual_memory_flush_one(vaddr);
 }

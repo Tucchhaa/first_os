@@ -98,11 +98,11 @@ uint8_t task_exec_user(struct task * task, const char * filepath) {
 
     // Mappings
     {
-    uintptr_t code;
+    uintptr_t code_addr;
     uint32_t code_size;
-    initrd_get_filedata(file_addr, &code, &code_size);
+    initrd_get_filedata(file_addr, &code_addr, &code_size);
 
-    task_create_user_mappings(task, (void *)code, code_size);
+    task_create_user_mappings(task, (void *)code_addr, code_size);
     }
 
     // Thread & Trapframe
@@ -123,6 +123,8 @@ uint8_t task_exec_user(struct task * task, const char * filepath) {
     trapframe->sepc = USER_CODE_VADDR;
     trapframe->sstatus = CSR_SSTATUS_SPIE | CSR_SSTATUS_SUM;
     }
+
+    virtual_memory_flush();
 
     return 0;
 }

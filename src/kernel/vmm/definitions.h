@@ -35,7 +35,7 @@ static const uint8_t PTE_KERNEL_PROT =
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_GLOBAL | PTE_EXECUTE | PTE_ACCESSED | PTE_DIRTY;
 static const uint8_t PTE_USER_CODE_PROT =
     PTE_VALID | PTE_READ | PTE_EXECUTE | PTE_USER | PTE_ACCESSED | PTE_DIRTY;
-static const uint8_t PTE_USER_STACK_PROT =
+static const uint8_t PTE_USER_ANON_PROT =
     PTE_VALID | PTE_READ | PTE_WRITE | PTE_USER | PTE_ACCESSED | PTE_DIRTY;
 
 static inline uint64_t make_pte(uint64_t paddr, uint8_t prot) {
@@ -44,4 +44,12 @@ static inline uint64_t make_pte(uint64_t paddr, uint8_t prot) {
 
 static inline uint64_t align_to_pte(uint64_t addr) {
     return (addr + pte_mem_size - 1) & ~(pte_mem_size - 1);
+}
+
+static inline uint64_t align_to_floor_pte(uint64_t addr) {
+    return addr & ~(pte_mem_size - 1);
+}
+
+static inline uint32_t get_pgd_index(uint64_t paddr) {
+    return (paddr >> (12 + 18)) & 0x1FF;
 }

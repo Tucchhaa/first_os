@@ -233,6 +233,10 @@ static struct linked_list_node * _get_buddy(uintptr_t block_addr, uint8_t order)
 }
 
 void memory_free_pages(void * block_addr) {
+    if ((uint64_t)block_addr == 0) {
+        return;
+    }
+
     uint8_t pie = interrupts_disable();
     struct page * page = memory_page_metadata((uintptr_t)block_addr);
 

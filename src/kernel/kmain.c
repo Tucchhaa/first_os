@@ -94,6 +94,9 @@ static void kernel_setup(uint64_t _fdt_addr) {
     // Note: setup UART at physical addr for debugging
     uart_sync_setup();
 
+    char a[40];
+    uart_sync_getline(a, 2);
+
     initrd_setup();
     memory_setup();
 

@@ -11,10 +11,6 @@
 extern char __kernel_start;
 extern char __kernel_end;
 
-static inline uint32_t get_pgd_index(uint64_t paddr) {
-    return (paddr >> (12 + 18)) & 0x1FF;
-}
-
 static uint64_t memory_base;
 static uint64_t memory_size;
 
@@ -41,7 +37,11 @@ uint8_t virtual_memory_setup(uintptr_t fdt_addr) {
         kernel_pgd[get_pgd_index(pgd_vaddr)] = make_pte(pgd_paddr, PTE_KERNEL_PROT);
     }
     // TODO: needed for uart
-    kernel_pgd[0] = make_pte(0, PTE_MMIO_PROT);
+    #ifdef PLATFORM_QEMU
+        kernel_pgd[get_pgd_index(0)] = make_pte(0, PTE_MMIO_PROT);
+    #elifdef PLATFORM_OPIRV2
+        kernel_pgd[get_pgd_index(0xd4017000)] = make_pte(0, PTE_MMIO_PROT);
+    #endif
 
     virtual_mmio_offset = KERNEL_VIRTUAL_BASE + offset;
 

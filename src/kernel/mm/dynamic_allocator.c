@@ -81,6 +81,10 @@ void * allocate(uint32_t size) {
 }
 
 void free(void * block_addr) {
+    if ((uint64_t)block_addr == 0) {
+        return;
+    }
+
     uint8_t pie = interrupts_disable();
     struct page * page = memory_page_metadata((uintptr_t)block_addr);
 

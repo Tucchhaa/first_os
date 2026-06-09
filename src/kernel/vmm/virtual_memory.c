@@ -26,7 +26,7 @@ uint64_t pa2va(uint64_t physical_addr) {
     return physical_addr + virtual_kernel_offset;
 }
 
-static inline uint64_t * pte_to_table_vaddr(uint64_t pte) {
+uint64_t * vaddr_from_pte(uint64_t pte) {
     // bits 10..53
     const uint64_t PTE_PPN_MASK = ((1ULL << 44) - 1) << 10; 
     uint64_t paddr = ((pte & PTE_PPN_MASK) >> 10) << 12;
@@ -35,6 +35,10 @@ static inline uint64_t * pte_to_table_vaddr(uint64_t pte) {
 
 static inline uint8_t is_leaf_pte(uint64_t pte) {
     return (pte & (PTE_READ | PTE_WRITE | PTE_EXECUTE)) != 0;
+}
+
+static inline uint64_t level_span(uint32_t level) {
+    return 1ULL << (12 + 9 * level);
 }
 
 // leaf_level=0 - maps a 4KiB page
@@ -59,7 +63,7 @@ static void pagewalk(
             *entry = make_pte(va2pa((uint64_t)table), PTE_VALID);
         }
 
-        current_table = pte_to_table_vaddr(*entry);
+        current_table = vaddr_from_pte(*entry);
     }
 
     uint64_t index = (vaddr >> (12 + 9 * leaf_level)) & 0x1FF;
@@ -116,6 +120,40 @@ void virtual_memory_flush() {
     asm volatile ("sfence.vma zero, zero" ::: "memory");
 }
 
+void virtual_memory_flush_one(uint64_t vaddr) {
+    asm volatile ("sfence.vma %0, zero" :: "r"(vaddr) : "memory");
+}
+
+void virtual_memory_traverse_leafs(
+    uint64_t * table, uint32_t level,
+    uint64_t table_base_vaddr,        // VA at table[0]
+    uint64_t start, uint64_t end,
+    void (*visit)(uint64_t * pte, uint64_t vaddr, void * ctx),
+    void * ctx
+) {
+    uint64_t span = level_span(level);
+
+    for (uint32_t i = 0; i < PAGE_TABLE_ENTRIES_NUM; i++) {
+        uint64_t entry_vaddr = table_base_vaddr + (uint64_t)i * span;
+        uint64_t entry_end   = entry_vaddr + span;
+
+        if (entry_end <= start) continue;
+        if (entry_vaddr >= end) break;
+
+        uint64_t pte = table[i];
+
+        if (pte == 0 || !(pte & PTE_VALID)) continue;
+
+        if (is_leaf_pte(pte)) {
+            visit(&table[i], entry_vaddr, ctx);
+            continue;
+        }
+
+        uint64_t * sub = vaddr_from_pte(pte);
+        virtual_memory_traverse_leafs(sub, level - 1, entry_vaddr, start, end, visit, ctx);
+    }
+}
+
 void virtual_memory_free_tables(uint64_t * table, uint32_t start_index, uint32_t n) {
     for (uint32_t i = start_index; i < start_index + n; i += 1) {
         uint64_t pte = table[i];
@@ -125,7 +163,7 @@ void virtual_memory_free_tables(uint64_t * table, uint32_t start_index, uint32_t
             continue;
         }
 
-        uint64_t * sub_table = pte_to_table_vaddr(pte);
+        uint64_t * sub_table = vaddr_from_pte(pte);
 
         virtual_memory_free_tables(sub_table, 0, PAGE_TABLE_ENTRIES_NUM);
         memory_free_pages((void *)sub_table);

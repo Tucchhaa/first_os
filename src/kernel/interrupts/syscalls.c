@@ -72,8 +72,6 @@ void _syscall_exec(struct trapframe * tf) {
         _syscall_set_result(tf, -1);
         return;
     }
-
-    virtual_memory_flush();
 }
 
 void _syscall_fork(struct trapframe * tf) {
@@ -188,10 +186,11 @@ void _syscall_mmap(struct trapframe * tf) {
     }
 
     uint8_t pie = interrupts_disable();
+
     struct mapping * mapping = task_add_mapping(
         get_current_task(),
         vaddr, size, 
-        get_mapping_prot(user_prot), flags
+        get_mapping_prot(user_prot), flags, 0
     );
 
     if (mapping == 0) {
